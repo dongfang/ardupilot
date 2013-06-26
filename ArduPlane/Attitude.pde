@@ -518,8 +518,22 @@ static void channel_output_mixer(uint8_t mixing_type, int16_t &chan1_out, int16_
 /*****************************************
 * Set the flight control servos based on the current calculated values
 *****************************************/
+
+bool didFirstInit = false;
+bool lastEnabledStatus;
+
 static void set_servos(void)
 {
+	if (!didFirstInit || servoOutEnabled != lastEnabledStatus) {
+		didFirstInit = true;
+		lastEnabledStatus = servoOutEnabled;
+		if (servoOutEnabled) {
+			hal.rcout->enable_mask(0b11111111);
+		} else {
+			hal.rcout->disable_mask(0b11111111);
+		}
+	}
+	
     int16_t last_throttle = channel_throttle->radio_out;
 
     if (control_mode == MANUAL) {

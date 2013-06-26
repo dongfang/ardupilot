@@ -83,7 +83,7 @@
 // This is now independent of whether you have a mux or not.
 #define MOBILE 2
 #ifndef SERIAL3_MODE
- # define SERIAL3_MODE DISABLED
+ # define SERIAL3_MODE ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////

@@ -51,6 +51,8 @@ public:
     void Log_Write_Message(const char *message);
     void Log_Write_Message_P(const prog_char_t *message);
 
+    void setCyclic(bool cyclic);
+
 	/*
       every logged packet starts with 3 bytes
     */

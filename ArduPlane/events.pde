@@ -110,7 +110,8 @@ static void update_events(void)
 
         switch (event_state.type) {
         case EVENT_TYPE_SERVO:
-            hal.rcout->enable_ch(event_state.rc_channel);
+        	if (servoOutEnabled)
+        		hal.rcout->enable_ch(event_state.rc_channel);
             if (event_state.repeat & 1) {
                 servo_write(event_state.rc_channel, event_state.undo_value);
             } else {

@@ -38,6 +38,11 @@ public:
     void ShowDeviceInfo(AP_HAL::BetterStream *port);
     void ListAvailableLogs(AP_HAL::BetterStream *port);
 
+    void setCyclic(bool cyclic) {
+    	this->isCyclic = cyclic;
+    }
+
+
 private:
     struct PageHeader {
         uint16_t FileNumber;
@@ -54,6 +59,7 @@ private:
     uint16_t df_FileNumber;
     uint16_t df_FilePage;
     bool log_write_started;
+    bool isCyclic;
 
     /*
       functions implemented by the board specific backends

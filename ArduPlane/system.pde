@@ -164,6 +164,9 @@ static void init_ardupilot()
 
 #if LOGGING_ENABLED == ENABLED
     DataFlash.Init();
+    
+    DataFlash.setCyclic(false);
+    
     if (!DataFlash.CardInserted()) {
         gcs_send_text_P(SEVERITY_LOW, PSTR("No dataflash card inserted"));
         g.log_bitmask.set(0);
@@ -670,6 +673,10 @@ static void servo_write(uint8_t ch, uint16_t pwm)
         return;
     }
 #endif
-    hal.rcout->enable_ch(ch);
-    hal.rcout->write(ch, pwm);
+	if (servoOutEnabled) {
+		hal.rcout->enable_ch(ch);
+	    hal.rcout->write(ch, pwm);
+	}
+	else 
+		hal.rcout->disable_ch(ch);
 }

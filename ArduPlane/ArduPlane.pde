@@ -108,6 +108,10 @@ static AP_Scheduler scheduler;
 // mapping between input channels
 static RCMapper rcmap;
 
+// detect if plane is crashed (somehow, see LandingChecker.pde)
+static bool isCrashed = false;
+static bool servoOutEnabled = true;
+
 // primary control channels
 static RC_Channel *channel_roll;
 static RC_Channel *channel_pitch;
@@ -671,6 +675,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { update_logging,         5,   1000 },
     { read_receiver_rssi,     5,   1000 },
     { check_long_failsafe,   15,   1000 },
+    { check_killRCOut,		 50,   1000 },
 };
 
 // setup the var_info table

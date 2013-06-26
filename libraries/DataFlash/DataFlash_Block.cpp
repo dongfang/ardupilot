@@ -28,9 +28,13 @@ void DataFlash_Block::FinishWrite(void)
     df_PageAdr++;
     // If we reach the end of the memory, start from the begining    
     // dongfang: Here is the wrap.
-    if (df_PageAdr > df_NumPages)
-        df_PageAdr = 1;
-
+    if (df_PageAdr > df_NumPages) {
+        if (isCyclic)
+        	df_PageAdr = 1;
+        else
+        	// Disable more logging.. I think at least thats what it does.
+        	log_write_started = false;
+    }
     // switch buffer
     df_BufferNum ^= 1;
     df_BufferIdx = 0;
