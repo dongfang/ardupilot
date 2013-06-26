@@ -27,16 +27,21 @@ static void set_control_channels(void)
 static void init_rc_in()
 {
     // set rc dead zones
-    channel_roll->set_dead_zone(20);
-    channel_pitch->set_dead_zone(20);
-    channel_rudder->set_dead_zone(20);
-    channel_throttle->set_dead_zone(4);
+    channel_roll->set_dead_zone(60);
+    channel_pitch->set_dead_zone(60);
+    channel_rudder->set_dead_zone(60);
+    channel_throttle->set_dead_zone(6);
+
+    //channel_roll->dead_zone  = 60;
+    //channel_pitch->dead_zone     = 60;
+    //channel_rudder->dead_zone    = 60;
+    //channel_throttle->dead_zone = 6;
 
     //set auxiliary ranges
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
     update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8, &g.rc_9, &g.rc_10, &g.rc_11, &g.rc_12);
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
-    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8, &g.rc_9, &g.rc_10, &g.rc_11);
+    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8, &g.rc_10, &g.rc_11);
 #else
     update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8);
 #endif
@@ -58,8 +63,10 @@ static void init_rc_out()
         RC_Channel::rc_channel(i)->output_trim();
     }
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
     servo_write(CH_9,   g.rc_9.radio_trim);
+#endif
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
     servo_write(CH_10,  g.rc_10.radio_trim);
     servo_write(CH_11,  g.rc_11.radio_trim);
 #endif

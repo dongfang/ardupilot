@@ -3,25 +3,15 @@
  *  logic for dealing with the current command in the mission and home location
  */
 
-/*
- * Called from
- * change_command
- * reload_commands_airstart
- */
 static void init_commands()
 {
-	// The persistent command index.
     g.command_index.set_and_save(0);
     nav_command_ID  = NO_COMMAND;
     non_nav_command_ID      = NO_COMMAND;
     next_nav_command.id     = CMD_BLANK;
-    // The transient command index.
     nav_command_index = 0;
 }
 
-/*
- * Apparently called only when switching into auto from another mode.
- */
 static void update_auto()
 {
     if (g.command_index >= g.command_total) {
@@ -32,8 +22,8 @@ static void update_auto()
         }
     } else {
         if(g.command_index != 0) {
-            g.command_index = nav_command_index;						// Update persistent command index
-            nav_command_index--;										// ????
+            g.command_index = nav_command_index;
+            nav_command_index--;
         }
         nav_command_ID  = NO_COMMAND;
         non_nav_command_ID      = NO_COMMAND;
@@ -96,7 +86,6 @@ static struct Location get_cmd_with_index(int16_t i)
     temp = get_cmd_with_index_raw(i);
 
     // Add on home altitude if we are a nav command (or other command with altitude) and stored alt is relative
-    // YGBSM!??!?! Are waypoints stored with relative altitude?
     if ((temp.id < MAV_CMD_NAV_LAST || temp.id == MAV_CMD_CONDITION_CHANGE_ALT) &&
         (temp.options & MASK_OPTIONS_RELATIVE_ALT) &&
         (temp.lat != 0 || temp.lng != 0 || temp.alt != 0)) {
@@ -153,16 +142,10 @@ static int32_t read_alt_to_hold()
     return g.RTL_altitude_cm + home.alt;
 }
 
+
 /*
- * This function stores waypoint commands
- * It looks to see what the next command type is and finds the last command.
- * Called from  
- * do_takeoff
- * do_nav_wp
- * do_land
- * do_loiter_unlimited
- * do_loiter_turns
- * do_loiter_time
+ *  This function stores waypoint commands
+ *  It looks to see what the next command type is and finds the last command.
  */
 static void set_next_WP(const struct Location *wp)
 {
@@ -185,6 +168,7 @@ static void set_next_WP(const struct Location *wp)
             next_WP.alt = current_loc.alt;
         }
     }
+
 
     // are we already past the waypoint? This happens when we jump
     // waypoints, and it can cause us to skip a waypoint. If we are
@@ -215,7 +199,6 @@ static void set_next_WP(const struct Location *wp)
     wp_totalDistance        = get_distance(&current_loc, &next_WP);
     wp_distance             = wp_totalDistance;
 
-    // This was done already.
     loiter_angle_reset();
 }
 
@@ -266,8 +249,6 @@ void init_home()
     home.id         = MAV_CMD_NAV_WAYPOINT;
     home.lng        = g_gps->longitude;                                 // Lon * 10**7
     home.lat        = g_gps->latitude;                                  // Lat * 10**7
-    
-    // This is not so good if you fly in a depression where alt < 0.
     home.alt        = max(g_gps->altitude, 0);
     home_is_set = true;
 
@@ -284,7 +265,9 @@ void init_home()
     // Load home for a default guided_WP
     // -------------
     guided_WP = home;
-    
-    // Is this going to cause trouble if g.RTL_altitude_cm is negative? 
     guided_WP.alt += g.RTL_altitude_cm;
+
 }
+
+
+

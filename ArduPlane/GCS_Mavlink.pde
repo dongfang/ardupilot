@@ -279,7 +279,7 @@ static void NOINLINE send_nav_controller_output(mavlink_channel_t chan)
         nav_controller->target_bearing_cd() * 0.01f,
         wp_distance,
         altitude_error_cm * 0.01,
-        airspeed_error_cm * 0.01,
+        airspeed_error_cm,
         nav_controller->crosstrack_error());
 }
 
@@ -835,14 +835,14 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] PROGMEM = {
 
 GCS_MAVLINK::GCS_MAVLINK() :
     packet_drops(0),
-    waypoint_send_timeout(8000), // 8 seconds
-    waypoint_receive_timeout(8000) // 8 seconds
+    waypoint_send_timeout(1000), // 1 second
+    waypoint_receive_timeout(1000) // 1 second
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
 
 void
-GCS_MAVLINK::init(AP_HAL::BetterStream *port)
+GCS_MAVLINK::init(AP_HAL::UARTDriver *port)
 {
     GCS_Class::init(port);
     if (port == (AP_HAL::BetterStream*)hal.uartA) {
@@ -908,7 +908,7 @@ GCS_MAVLINK::update(void)
 
     if (waypoint_receiving &&
         waypoint_request_i <= waypoint_request_last &&
-        tnow > waypoint_timelast_request + 200 + (stream_slowdown*20)) {
+        tnow > waypoint_timelast_request + 500 + (stream_slowdown*20)) {
         waypoint_timelast_request = tnow;
         send_message(MSG_NEXT_WAYPOINT);
     }
@@ -1503,8 +1503,6 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
         if (mavlink_check_target(packet.target_system,packet.target_component)) break;
 
         // start waypoint receiving
-        // If start_index > g.command_total and end_index<= g.command_total then start_index > end_index.
-        // the 1st or the 3rd check is not necessary.
         if (packet.start_index > g.command_total ||
             packet.end_index > g.command_total ||
             packet.end_index < packet.start_index) {
@@ -2142,9 +2140,6 @@ static void gcs_data_stream_send(void)
  */
 static void gcs_update(void)
 {
-#if SERIAL3_MODE == MOBILE
-	mobile.task();
-#endif
     gcs0.update();
     if (gcs3.initialised) {
         gcs3.update();
