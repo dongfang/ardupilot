@@ -2143,6 +2143,7 @@ static void gcs_data_stream_send(void)
 static void gcs_update(void)
 {
 #if SERIAL3_MODE == MOBILE
+	// This is really better placed here than as a separate scheduler task. Checked it.
 	mobile.task();
 #endif
     gcs0.update();

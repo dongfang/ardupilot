@@ -542,6 +542,15 @@ void MobileDriver::DataTransmissionState::task(MobileDriver & outer) const {
 		}
 	}
 
+	/*
+	 * OK.. we have to eliminate one of the too many buffers.
+	 * We cannot have the client transmit drive the data to the mobile (too slow).
+	 * Instead we should have a sort of redirect buffer: in the transmit buffer to
+	 * mobile, we mark that the next xxx bytes should be sucked directly from client's
+	 * transmit buffer. So obviously the mobile transmit buffer needs some sort of
+	 * reference to the client ditto.
+	 */
+
 	// Then send the data in the largest possible chunks.
 	if (outer._progress == P_TRANSMITTING) {
 		numBytes = outer._numTxBytes;
@@ -644,8 +653,8 @@ void MobileDriver::begin(BetterStream* mobile, int16_t rxSpace, int16_t txSpace)
 	_txBuffer.begin(txSpace);
 	// The application is expected to init the serial port! Not we. However it might
 	// make sense to do it anyway, reducing buffer sizes if possible.
-	// With 57600 baud and 50 invocations/sec, there should still be enough space for
-	// receiving 116 bytes though.
+	// With 57600 baud and 100 invocations/sec, there should still be enough space for
+	// receiving 58 bytes though.
 	// mobile->begin(rxSpace, txSpace);
 	beginState(_savedState = initialState());
 }
