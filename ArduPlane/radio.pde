@@ -27,10 +27,15 @@ static void set_control_channels(void)
 static void init_rc_in()
 {
     // set rc dead zones
-    channel_roll->set_dead_zone(20);
-    channel_pitch->set_dead_zone(20);
-    channel_rudder->set_dead_zone(20);
-    channel_throttle->set_dead_zone(4);
+    channel_roll->set_dead_zone(60);
+    channel_pitch->set_dead_zone(60);
+    channel_rudder->set_dead_zone(60);
+    channel_throttle->set_dead_zone(6);
+
+    //channel_roll->dead_zone  = 60;
+    //channel_pitch->dead_zone     = 60;
+    //channel_rudder->dead_zone    = 60;
+    //channel_throttle->dead_zone = 6;
 
     //set auxiliary ranges
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4

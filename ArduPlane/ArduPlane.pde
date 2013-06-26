@@ -55,8 +55,6 @@
 #include <SITL.h>
 #include <AP_Scheduler.h>       // main loop scheduler
 
-#include <MobileDriver.h>
-
 #include <AP_Navigation.h>
 #include <AP_L1_Control.h>
 #include <AP_RCMapper.h>        // RC input mapping library
@@ -253,10 +251,6 @@ static bool training_manual_pitch; // user has manual pitch control
 static GCS_MAVLINK gcs0;
 static GCS_MAVLINK gcs3;
 
-#if SERIAL3_MODE == MOBILE
-SIM900Driver mobile;
-#endif
-
 // selected navigation controller
 static AP_Navigation *nav_controller = &L1_controller;
 
@@ -391,8 +385,6 @@ static int32_t hold_course_cd                 = -1;              // deg * 100 di
 static uint8_t nav_command_index;
 // This indicates the active non-navigation command by index number
 static uint8_t non_nav_command_index;
-
-
 // This is the command type (eg navigate to waypoint) of the active navigation command
 static uint8_t nav_command_ID          = NO_COMMAND;
 static uint8_t non_nav_command_ID      = NO_COMMAND;
@@ -775,8 +767,7 @@ static void fast_loop()
 #endif
 
     // custom code/exceptions for flight modes
-    // calculates target angles and throttle from current control mode.
-    // (stabilize sets them to zero and manual passes RC almost direct to servos).
+    // calculates roll, pitch and yaw demands from navigation demands
     // --------------------------------------------------------------
     update_current_flight_mode();
 
@@ -953,7 +944,6 @@ static void update_GPS(void)
 
             } else {
                 if(ENABLE_AIR_START == 1 && (ground_start_avg / 5) < SPEEDFILT) {
-		// Triggered in air start once, when detected we are on the ground.
                     startup_ground();
 
                     if (g.log_bitmask & MASK_LOG_CMD)
@@ -961,11 +951,9 @@ static void update_GPS(void)
 
                     init_home();
                 } else if (ENABLE_AIR_START == 0) {
-		// Triggered in ground start once.
                     init_home();
                 }
 
-		// Triggered in air start once and in ground start once.
                 if (g.compass_enabled) {
                     // Set compass declination automatically
                     compass.set_initial_location(g_gps->latitude, g_gps->longitude);
@@ -1053,7 +1041,7 @@ static void update_current_flight_mode(void)
             calc_throttle();
             break;
         }
-    } else { // control_mode is not AUTO
+    }else{
         // hold_course is only used in takeoff and landing
         hold_course_cd = -1;
 
@@ -1099,7 +1087,6 @@ static void update_current_flight_mode(void)
 
         case FLY_BY_WIRE_A: {
             // set nav_roll and nav_pitch using sticks
-            // dongfang: Is this necessary? norm_input() should not return more than +-1.
             nav_roll_cd  = channel_roll->norm_input() * g.roll_limit_cd;
             nav_roll_cd = constrain_int32(nav_roll_cd, -g.roll_limit_cd, g.roll_limit_cd);
             float pitch_input = channel_pitch->norm_input();
@@ -1171,7 +1158,6 @@ static void update_current_flight_mode(void)
 
         case MANUAL:
             // servo_out is for Sim control only
-        	// What??? Why not use control_in?
             // ---------------------------------
             channel_roll->servo_out = channel_roll->pwm_to_angle();
             channel_pitch->servo_out = channel_pitch->pwm_to_angle();
@@ -1187,9 +1173,6 @@ static void update_current_flight_mode(void)
     }
 }
 
-/*
- * Called (only) from navigate() in navigation.pde (why not just move it to there)
- */
 static void update_navigation()
 {
     // wp_distance is in ACTUAL meters, not the *100 meters we get from the GPS
@@ -1239,6 +1222,4 @@ static void update_alt()
     //	add_altitude_data(millis() / 100, g_gps->altitude / 10);
 }
 
-// This is a replacement main() function macro. It does hal init, setup(), scheduler start 
-// and runs loop() forever.
 AP_HAL_MAIN();
