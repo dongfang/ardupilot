@@ -19,16 +19,13 @@
 #include "state.h"
 
 /* Does the Followme device send a heartbeat? Helpful for debugging. */
-#define CONFIG_FOLLOWME_SENDS_HEARTBEAT 0
+#define CONFIG_FOLLOWME_SENDS_HEARTBEAT 1
 /* Does the hal console tunnel over mavlink? Requires patched MAVProxy. */
 #define CONFIG_FOLLOWME_MAVCONSOLE 0
 
-const AP_HAL::HAL& hal = AP_HAL_AVR_APM1;
+const AP_HAL::HAL& hal = AP_HAL_AVR_APM2;
 
-// Channel to/from UAV
 mavlink_channel_t upstream_channel = MAVLINK_COMM_1;
-
-// Channel to/from additional GS
 mavlink_channel_t downstream_channel = MAVLINK_COMM_0;
 
 GPS* gps;
@@ -76,7 +73,6 @@ void setup(void) {
 #endif
 
     hal.console->println_P(PSTR("User input init"));
-    // Digital inputs 57 (activate) and 51 (disable), analog 0 and 1.
     input.init(57, 0, 1, 51);
     input.side_btn_event_callback(sm_on_button_activate);
     input.joy_btn_event_callback(sm_on_button_cancel);
@@ -97,7 +93,7 @@ void loop(void) {
     /* Receive messages off the downstream, send them upstream: */
     simplegcs_update(downstream_channel, upstream_handler);
 
-    /* Receive messages off the upstream, send them downstream: */
+    /* Receive messages off the downstream, send them upstream: */
     simplegcs_update(upstream_channel, downstream_handler);
 }
 

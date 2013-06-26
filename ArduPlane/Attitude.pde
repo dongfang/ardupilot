@@ -107,15 +107,15 @@ static void stabilize_stick_mixing_direct()
         
     ch1_inf = (float)channel_roll->radio_in - (float)channel_roll->radio_trim;
     ch1_inf = fabsf(ch1_inf);
-    ch1_inf = min(ch1_inf, 400.0);			// limit to [0..400]
-    ch1_inf = ((400.0 - ch1_inf) /400.0);	// 0->1, 400->0, >400->0
+    ch1_inf = min(ch1_inf, 400.0);
+    ch1_inf = ((400.0 - ch1_inf) /400.0);
         
     ch2_inf = (float)channel_pitch->radio_in - channel_pitch->radio_trim;
     ch2_inf = fabsf(ch2_inf);
     ch2_inf = min(ch2_inf, 400.0);
     ch2_inf = ((400.0 - ch2_inf) /400.0);
         
-    // scale the sensor input based on the stick input (servo_out was set in stabilize_pitch/roll)
+    // scale the sensor input based on the stick input
     // -----------------------------------------------
     channel_roll->servo_out  *= ch1_inf;
     channel_pitch->servo_out *= ch2_inf;
@@ -144,9 +144,6 @@ static void stabilize_stick_mixing_fbw()
     // non-linear and ends up as 2x the maximum, to ensure that
     // the user can direct the plane in any direction with stick
     // mixing.
-
-    
-    // This needed not be done with floats. If that is removed, norm_input() could also go.
     float roll_input = channel_roll->norm_input();
     if (roll_input > 0.5f) {
         roll_input = (3*roll_input - 1);
@@ -194,6 +191,7 @@ static void stabilize_yaw(float speed_scaler)
     channel_rudder->servo_out *= ch4_inf;
     channel_rudder->servo_out += channel_rudder->pwm_to_angle();
 }
+
 
 /*
   a special stabilization function for training mode
@@ -284,9 +282,7 @@ static void calc_throttle()
 
         // no airspeed sensor, we use nav pitch to determine the proper throttle output
         // AUTO, RTL, etc
-        // g.channel_throttle.servo_out = throttle_target + 
-        // (g.throttle_max - throttle_target) * nav_pitch_cd / g.pitch_limit_max_cd
-        // -------------------------------------------------------------
+        // ---------------------------------------------------------------------------
         if (nav_pitch_cd >= 0) {
             channel_throttle->servo_out = throttle_target + (g.throttle_max - throttle_target) * nav_pitch_cd / g.pitch_limit_max_cd;
         } else {

@@ -908,7 +908,7 @@ GCS_MAVLINK::update(void)
 
     if (waypoint_receiving &&
         waypoint_request_i <= waypoint_request_last &&
-        tnow > waypoint_timelast_request + 200 + (stream_slowdown*20)) {
+        tnow > waypoint_timelast_request + 500 + (stream_slowdown*20)) {
         waypoint_timelast_request = tnow;
         send_message(MSG_NEXT_WAYPOINT);
     }

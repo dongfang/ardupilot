@@ -387,8 +387,6 @@ static int32_t hold_course_cd                 = -1;              // deg * 100 di
 static uint8_t nav_command_index;
 // This indicates the active non-navigation command by index number
 static uint8_t non_nav_command_index;
-
-
 // This is the command type (eg navigate to waypoint) of the active navigation command
 static uint8_t nav_command_ID          = NO_COMMAND;
 static uint8_t non_nav_command_ID      = NO_COMMAND;
@@ -1234,6 +1232,4 @@ static void update_alt()
     //	add_altitude_data(millis() / 100, g_gps->altitude / 10);
 }
 
-// This is a replacement main() function macro. It does hal init, setup(), scheduler start 
-// and runs loop() forever.
 AP_HAL_MAIN();

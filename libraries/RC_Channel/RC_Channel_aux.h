@@ -11,7 +11,6 @@
 
 /// @class	RC_Channel_aux
 /// @brief	Object managing one aux. RC channel (CH5-8), with information about its function
-/// Does not have other state than: Function type, and whatever the super RC_Channel instance has.
 class RC_Channel_aux : public RC_Channel {
 public:
     /// Constructor
@@ -53,7 +52,6 @@ public:
 
     AP_Int8         function;           ///< see Aux_servo_function_t enum
 
-    // Performs output (does _not_ set the hardware channel!)
     void            output_ch(unsigned char ch_nr);
 
 	// set radio_out for a function channel

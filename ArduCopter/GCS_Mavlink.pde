@@ -2248,4 +2248,3 @@ static void gcs_send_text_fmt(const prog_char_t *fmt, ...)
         mavlink_send_message(MAVLINK_COMM_1, MSG_STATUSTEXT, 0);
     }
 }
-
