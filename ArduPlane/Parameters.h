@@ -128,6 +128,7 @@ public:
         k_param_barometer,   // barometer ground calibration
         k_param_airspeed,  // AP_Airspeed parameters
         k_param_curr_amp_offset,
+        k_param_optflow_enabled,
 
         //
         // 150: Navigation parameters
@@ -142,7 +143,6 @@ public:
         k_param_inverted_flight_ch,
         k_param_min_gndspeed_cm,
         k_param_crosstrack_use_wind, // unused
-
 
         //
         // Camera and mount parameters
@@ -360,6 +360,7 @@ public:
 #endif
 
     AP_Int8 compass_enabled;
+    AP_Int8 optflow_enabled,
     AP_Int8 battery_monitoring;                 // 0=disabled, 3=voltage only, 4=voltage and current
     AP_Int8 flap_1_percent;
     AP_Int8 flap_1_speed;

@@ -97,3 +97,23 @@ static int32_t adjusted_altitude_cm(void)
 {
     return current_loc.alt - (g.alt_offset*100);
 }
+
+static void init_optflow()
+{
+#if OPTFLOW == ENABLED
+    if( optflow.init() == false) {
+        g.optflow_enabled = false;
+        cliSerial->print_P(PSTR("\nFailed to Init OptFlow "));
+        Log_Write_Error(ERROR_SUBSYSTEM_OPTFLOW,ERROR_CODE_FAILED_TO_INITIALISE);
+    } else {
+        // suspend timer while we set-up SPI communication
+        hal.scheduler->suspend_timer_procs();
+        optflow.set_orientation(OPTFLOW_ORIENTATION);   // set optical flow sensor's orientation on aircraft
+        optflow.set_frame_rate(2000);                   // set minimum update rate (which should lead to maximum low light performance
+        optflow.set_resolution(OPTFLOW_RESOLUTION);     // set optical flow sensor's resolution
+        optflow.set_field_of_view(OPTFLOW_FOV);         // set optical flow sensor's field of view
+        // resume timer
+        hal.scheduler->resume_timer_procs();
+    }
+#endif      // OPTFLOW == ENABLED
+}

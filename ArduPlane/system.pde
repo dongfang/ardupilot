@@ -189,6 +189,11 @@ static void init_ardupilot()
     // give AHRS the airspeed sensor
     ahrs.set_airspeed(&airspeed);
 
+    // init the optical flow sensor
+    if(g.optflow_enabled) {
+        init_optflow();
+    }
+    
     // the axis controllers need access to the AHRS system
     g.rollController.set_ahrs(&ahrs);
     g.pitchController.set_ahrs(&ahrs);
@@ -260,7 +265,7 @@ static void init_ardupilot()
             Log_Write_Startup(TYPE_AIRSTART_MSG);
         reload_commands_airstart();                     // Get set to resume AUTO from where we left off
 
-    }else {
+    } else {
         startup_ground();
         if (g.log_bitmask & MASK_LOG_CMD)
             Log_Write_Startup(TYPE_GROUNDSTART_MSG);

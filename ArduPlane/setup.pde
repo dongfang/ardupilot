@@ -7,6 +7,7 @@ static int8_t   setup_radio                             (uint8_t argc, const Men
 static int8_t   setup_show                              (uint8_t argc, const Menu::arg *argv);
 static int8_t   setup_factory                   (uint8_t argc, const Menu::arg *argv);
 static int8_t   setup_flightmodes               (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_optflow           (uint8_t argc, const Menu::arg *argv);
 static int8_t   setup_level                             (uint8_t argc, const Menu::arg *argv);
 #if !defined( __AVR_ATmega1280__ )
 static int8_t   setup_accel_scale                       (uint8_t argc, const Menu::arg *argv);
@@ -25,6 +26,7 @@ static const struct Menu::command setup_menu_commands[] PROGMEM = {
     {"reset",                       setup_factory},
     {"radio",                       setup_radio},
     {"modes",                       setup_flightmodes},
+    {"optflow",                     setup_optflow},
     {"level",                       setup_level},
 #if !defined( __AVR_ATmega1280__ )
     {"accel",                       setup_accel_scale},
@@ -345,6 +347,28 @@ setup_flightmodes(uint8_t argc, const Menu::arg *argv)
             return (0);
         }
     }
+}
+
+static int8_t setup_optflow(uint8_t argc, const Menu::arg *argv)
+{
+ #if OPTFLOW == ENABLED
+    if (!strcmp_P(argv[1].str, PSTR("on"))) {
+        g.optflow_enabled = true;
+        init_optflow();
+
+    } else if (!strcmp_P(argv[1].str, PSTR("off"))) {
+        g.optflow_enabled = false;
+
+    }else{
+        cliSerial->printf_P(PSTR("\nOp:[on, off]\n"));
+        report_optflow();
+        return 0;
+    }
+
+    g.optflow_enabled.save();
+    report_optflow();
+ #endif     // OPTFLOW == ENABLED
+    return 0;
 }
 
 static int8_t

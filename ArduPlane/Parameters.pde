@@ -586,6 +586,13 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(compass_enabled,        "MAG_ENABLE",     1),
 
+    // @Param: FLOW_ENABLE
+    // @DisplayName: Enable Optical Flow
+    // @Description: Setting this to Enabled(1) will enable optical flow. Setting this to Disabled(0) will disable optical flow
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    GSCALAR(optflow_enabled,        "FLOW_ENABLE",  DISABLED),
+
     // @Param: FLAP_1_PERCNT
     // @DisplayName: Flap 1 percentage
     // @Description: The percentage change in flap position when FLAP_1_SPEED is reached. Use zero to disable flaps
