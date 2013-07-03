@@ -38,6 +38,8 @@
 #include <AP_AHRS.h>         // ArduPilot Mega DCM Library
 #include <PID.h>            // PID library
 #include <RC_Channel.h>     // RC Channel Library
+#include <AP_OpticalFlow.h>     // Optical Flow library
+
 #include <AP_RangeFinder.h>     // Range finder library
 #include <Filter.h>                     // Filter library
 #include <AP_Buffer.h>      // APM FIFO Buffer
@@ -236,6 +238,17 @@ static AP_L1_Control L1_controller(&ahrs);
 #if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 SITL sitl;
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+// Optical flow sensor
+////////////////////////////////////////////////////////////////////////////////
+ #if OPTFLOW == ENABLED
+hund
+static AP_OpticalFlow_ADNS3080 optflow;
+ #else
+ged
+static AP_OpticalFlow optflow;
+ #endif
 
 // Training mode
 static bool training_manual_roll;  // user has manual roll control
@@ -663,6 +676,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { update_logging,         5,   1000 },
     { read_receiver_rssi,     5,   1000 },
     { check_long_failsafe,   15,   1000 },
+    { update_optical_flow,    5,   1000 },
 };
 
 // setup the var_info table
@@ -900,6 +914,15 @@ static void one_second_loop()
         counter = 0;
     }
 }
+
+// called at 20hz and data from sensor arrives at 20 Hz
+#if OPTFLOW == ENABLED
+static void update_optical_flow(void) {
+    // if new data has arrived, process it
+    last_of_update = optflow.last_update;
+    optflow.update_height(ahrs.roll, ahrs.pitch, pitchrate, rollrate, groundspeed);
+}
+#endif  // OPTFLOW == ENABLED
 
 /*
   read the GPS and update position
