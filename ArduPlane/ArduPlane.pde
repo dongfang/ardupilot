@@ -243,10 +243,8 @@ SITL sitl;
 // Optical flow sensor
 ////////////////////////////////////////////////////////////////////////////////
  #if OPTFLOW == ENABLED
-hund
 static AP_OpticalFlow_ADNS3080 optflow;
  #else
-ged
 static AP_OpticalFlow optflow;
  #endif
 
@@ -919,8 +917,7 @@ static void one_second_loop()
 #if OPTFLOW == ENABLED
 static void update_optical_flow(void) {
     // if new data has arrived, process it
-    last_of_update = optflow.last_update;
-    optflow.update_height(ahrs.roll, ahrs.pitch, pitchrate, rollrate, groundspeed);
+    //optflow.update_height(ahrs.roll, ahrs.pitch, pitchrate, rollrate, groundspeed);
 }
 #endif  // OPTFLOW == ENABLED
 

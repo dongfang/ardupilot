@@ -360,7 +360,7 @@ public:
 #endif
 
     AP_Int8 compass_enabled;
-    AP_Int8 optflow_enabled,
+    AP_Int8 optflow_enabled;
     AP_Int8 battery_monitoring;                 // 0=disabled, 3=voltage only, 4=voltage and current
     AP_Int8 flap_1_percent;
     AP_Int8 flap_1_speed;

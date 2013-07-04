@@ -21,12 +21,18 @@ void setup()
     hal.console->println("ArduPilot Mega OpticalFlow library test ver 1.5");
 
     hal.scheduler->delay(1000);
+    
+    int reason = -1;
 
     // flowSensor initialization
-    if( flowSensor.init() == false ) {
+    if(flowSensor.init(&reason) == false) {
         hal.console->print("Failed to initialise ADNS3080 ");
+        hal.console->print(reason);
+    } else {
+        hal.console->print("Initialise ADNS3080 okay");
+        hal.console->print(reason);
     }
-
+    
     flowSensor.set_orientation(AP_OPTICALFLOW_ADNS3080_PINS_FORWARD);
     flowSensor.set_field_of_view(AP_OPTICALFLOW_ADNS3080_08_FOV);
 

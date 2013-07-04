@@ -54,6 +54,8 @@ AP_OpticalFlow_ADNS3080::init()
     // reset the device
     reset();
 
+    // remove again!
+
     // get pointer to the spi bus
     _spi = hal.spi->device(AP_HAL::SPIDevice_ADNS3080_SPI0);
     if (_spi == NULL) {
@@ -62,7 +64,7 @@ AP_OpticalFlow_ADNS3080::init()
 
     // check 3 times for the sensor on standard SPI bus
     while( retvalue == false && retry < 3 ) {
-        if( read_register(ADNS3080_PRODUCT_ID) == 0x17 ) {
+        if (read_register(ADNS3080_PRODUCT_ID) == 0x17) {
             retvalue = true;
             goto finish;
         }
@@ -77,8 +79,8 @@ AP_OpticalFlow_ADNS3080::init()
 
     // check 3 times on SPI3
     retry = 0;
-    while( retvalue == false && retry < 3 ) {
-        if( read_register(ADNS3080_PRODUCT_ID) == 0x17 ) {
+    while(retvalue == false && retry < 3 ) {
+        if(read_register(ADNS3080_PRODUCT_ID) == 0x17) {
             retvalue = true;
         }
         retry++;
@@ -91,13 +93,8 @@ AP_OpticalFlow_ADNS3080::init()
 finish:
     // if device is working register the global static read function to
     // be called at 1khz
-    if( retvalue ) {
+    if(retvalue) {
         hal.scheduler->register_timer_process( AP_OpticalFlow_ADNS3080::read );
-        _spi_sem = _spi->get_semaphore();
-        if (_spi_sem == NULL) {
-            hal.scheduler->panic(PSTR("PANIC: Got SPI Driver, but did not "
-                        "get valid SPI semaphore in AP_Optflow_ADNS3080"));
-        }
     }
 
     // resume timer
@@ -110,13 +107,15 @@ finish:
 // Read a register from the sensor
 uint8_t AP_OpticalFlow_ADNS3080::read_register(uint8_t address)
 {
-    if (_spi == NULL) return 0;
+    if (_spi == NULL)
+    	return 0;
 
-    if (!_spi_sem->take_nonblocking()) {
-        return 0;
-    }
+    // TODO: Problematic. The zero returned if semaphore could not be gotten is indistinguishable from zero data
+    if (!_spi->get_semaphore()->take_nonblocking())
+    	return 0;
 
     _spi->cs_assert();
+
     // send the device the register you want to read:
     _spi->transfer(address);
     hal.scheduler->delay_microseconds(50);
@@ -124,8 +123,7 @@ uint8_t AP_OpticalFlow_ADNS3080::read_register(uint8_t address)
     uint8_t result = _spi->transfer(0x00);
 
     _spi->cs_release();
-
-    _spi_sem->give();
+    _spi->get_semaphore()->give();
 
     return result;
 }
@@ -135,9 +133,8 @@ void AP_OpticalFlow_ADNS3080::write_register(uint8_t address, uint8_t value)
 {
     if (_spi == NULL) return;
 
-    if (!_spi_sem->take_nonblocking()) {
-        return;
-    }
+    if (!_spi->get_semaphore()->take_nonblocking())
+    	return;
 
     _spi->cs_assert();
 
@@ -148,8 +145,7 @@ void AP_OpticalFlow_ADNS3080::write_register(uint8_t address, uint8_t value)
     _spi->transfer(value);
 
     _spi->cs_release();
-
-    _spi_sem->give();
+    _spi->get_semaphore()->give();
 }
 
 // reset sensor by holding a pin high (or is it low?) for 10us.

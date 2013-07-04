@@ -104,7 +104,7 @@ static void init_optflow()
     if( optflow.init() == false) {
         g.optflow_enabled = false;
         cliSerial->print_P(PSTR("\nFailed to Init OptFlow "));
-        Log_Write_Error(ERROR_SUBSYSTEM_OPTFLOW,ERROR_CODE_FAILED_TO_INITIALISE);
+        // Log_Write_Error(ERROR_SUBSYSTEM_OPTFLOW,ERROR_CODE_FAILED_TO_INITIALISE);
     } else {
         // suspend timer while we set-up SPI communication
         hal.scheduler->suspend_timer_procs();

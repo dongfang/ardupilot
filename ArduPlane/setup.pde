@@ -679,5 +679,14 @@ print_gyro_offsets(void)
                     (float)gyro_offsets.z);
 }
 
+void report_optflow()
+{
+ #if OPTFLOW == ENABLED
+    cliSerial->printf_P(PSTR("OptFlow\n"));
+    print_divider();
+    print_enabled(g.optflow_enabled);
+    print_blanks(2);
+ #endif     // OPTFLOW == ENABLED
+}
 
 #endif // CLI_ENABLED
