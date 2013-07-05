@@ -40,7 +40,7 @@ void AP_OpticalFlow::read(uint32_t now)
 {
     _num_calls++;
 
-    if( _num_calls >= AP_OPTICALFLOW_NUM_CALLS_FOR_20HZ ) {
+    if( _num_calls >= AP_OPTICALFLOW_NUM_CALLS_FOR_10HZ ) {
         _num_calls = 0;
         // call to update all attached sensors
         if( _sensor != NULL ) {
@@ -59,10 +59,8 @@ uint8_t AP_OpticalFlow::read_register(uint8_t address){ return 0; }
 void AP_OpticalFlow::write_register(uint8_t address, uint8_t value) {}
 
 // rotate raw values to arrive at final x,y,dx and dy values
-void AP_OpticalFlow::apply_orientation_matrix()
-{
-    Vector3f rot_vector;
-    rot_vector(raw_dx, raw_dy, 0);
+void AP_OpticalFlow::apply_orientation_matrix(int16_t raw_dx, int16_t raw_dy) {
+    Vector3f rot_vector(raw_dx, raw_dy, 0);
 
     // next rotate dx and dy
     rot_vector.rotate(_orientation);
@@ -72,15 +70,14 @@ void AP_OpticalFlow::apply_orientation_matrix()
 
     // add rotated values to totals (perhaps this is pointless as we need
     // to take into account yaw, roll, pitch)
-    x += dx;
-    y += dy;
+    // x += dx;
+    // y += dy;
 }
 
 // updates conversion factors that are dependent upon field_of_view
-void AP_OpticalFlow::update_conversion_factors()
-{
-    // multiply this number by altitude and pixel change to get horizontal
-    // move (in same units as altitude)
+void AP_OpticalFlow::update_conversion_factors() {
+	// Intended: conv_factor * height[unit] * pixels_shifted = horizontal shift[unit].
+	// Analysis: height[unit]
     conv_factor = ((1.0f / (float)(num_pixels * scaler))
                    * 2.0f * tanf(field_of_view / 2.0f));
     // 0.00615
@@ -90,8 +87,7 @@ void AP_OpticalFlow::update_conversion_factors()
 
 // updates internal lon and lat with estimation based on optical flow
 void AP_OpticalFlow::update_position(float roll, float pitch,
-        float sin_yaw, float cos_yaw, float altitude)
-{
+        float sin_yaw, float cos_yaw, float externalHeight) {
     float diff_roll     = roll  - _last_roll;
     float diff_pitch    = pitch - _last_pitch;
 
@@ -99,7 +95,7 @@ void AP_OpticalFlow::update_position(float roll, float pitch,
     // over 45 degrees
     if( surface_quality >= 10 && fabsf(roll) <= FORTYFIVE_DEGREES
      && fabsf(pitch) <= FORTYFIVE_DEGREES ) {
-	altitude = max(altitude, 0);
+    	externalHeight = max(externalHeight, 0);
         // calculate expected x,y diff due to roll and pitch change
         exp_change_x = diff_roll * radians_to_pixels;
         exp_change_y = -diff_pitch * radians_to_pixels;
@@ -108,22 +104,62 @@ void AP_OpticalFlow::update_position(float roll, float pitch,
         change_x = dx - exp_change_x;
         change_y = dy - exp_change_y;
 
-        float avg_altitude = (altitude + _last_altitude)*0.5f;
+        float avg_height = (externalHeight + _last_height) * 0.5f;
 
         // convert raw change to horizontal movement in cm
         // perhaps this altitude should actually be the distance to the
         // ground?  i.e. if we are very rolled over it should be longer?
-        x_cm = -change_x * avg_altitude * conv_factor;
+        x_cm = -change_x * avg_height * conv_factor;
         // for example if you are leaned over at 45 deg the ground will
         // appear farther away and motion from opt flow sensor will be less
-        y_cm = -change_y * avg_altitude * conv_factor;
+        y_cm = -change_y * avg_height * conv_factor;
 
         // convert x/y movements into lon/lat movement
         vlon = x_cm * cos_yaw + y_cm * sin_yaw;
         vlat = y_cm * cos_yaw - x_cm * sin_yaw;
     }
 
-    _last_altitude = altitude;
+    _last_height = externalHeight;
+    _last_roll = roll;
+    _last_pitch = pitch;
+}
+
+// updates internal height over ground with estimation based on optical flow
+void AP_OpticalFlow::update_height(float roll, float pitch, float dpf)
+{
+	// For now, we only consider velocity in the forward idrection.
+	// Sideways flight, sideslip etc. are not accounted for.
+    // float diff_roll     = roll  - _last_roll;
+    float diff_pitch    = pitch - _last_pitch;
+
+    // only update position if surface quality is good and angle is not
+    // over 45 degrees
+    if( surface_quality >= 10 && fabsf(roll) <= FORTYFIVE_DEGREES
+     && fabsf(pitch) <= FORTYFIVE_DEGREES ) {
+
+    	// calculate expected x,y diff due to roll and pitch change
+        // exp_change_x = diff_roll * radians_to_pixels;
+        exp_change_y = -diff_pitch * radians_to_pixels;
+
+        // real estimated raw change from mouse
+        // change_x = dx - exp_change_x;
+        change_y = dy - exp_change_y;
+
+        if (change_y > 0) {
+        	height = dpf / (change_y * conv_factor);
+        	if (_last_height) {
+        		height = (height + _last_height) / 2.0f;
+        	}
+            _last_height = height;
+        }
+        else {
+        	if (change_y < 0)		// debug: reverse net movement.
+        		height = -2;
+        	else // debug: no or too slow movement. Anyway that means nice and safely high, hopefully.
+        		height = 200;
+        	_last_height = 0; // Flag to indicate not valid.
+        }
+    }
     _last_roll = roll;
     _last_pitch = pitch;
 }

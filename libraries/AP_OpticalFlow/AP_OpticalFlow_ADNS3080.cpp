@@ -54,8 +54,6 @@ AP_OpticalFlow_ADNS3080::init()
     // reset the device
     reset();
 
-    // remove again!
-
     // get pointer to the spi bus
     _spi = hal.spi->device(AP_HAL::SPIDevice_ADNS3080_SPI0);
     if (_spi == NULL) {
@@ -63,7 +61,7 @@ AP_OpticalFlow_ADNS3080::init()
     }
 
     // check 3 times for the sensor on standard SPI bus
-    while( retvalue == false && retry < 3 ) {
+    while(retvalue == false && retry < 3) {
         if (read_register(ADNS3080_PRODUCT_ID) == 0x17) {
             retvalue = true;
             goto finish;
@@ -94,7 +92,7 @@ finish:
     // if device is working register the global static read function to
     // be called at 1khz
     if(retvalue) {
-        hal.scheduler->register_timer_process( AP_OpticalFlow_ADNS3080::read );
+        hal.scheduler->register_timer_process( AP_OpticalFlow_ADNS3080::read);
     }
 
     // resume timer
@@ -164,9 +162,8 @@ AP_OpticalFlow_ADNS3080::reset()
 }
 
 // read latest values from sensor and fill in x,y and totals
-void
-AP_OpticalFlow_ADNS3080::update(uint32_t now)
-{
+// Is supposed to happen at 20Hz (or whatever divider is used in read() in superclass)
+void AP_OpticalFlow_ADNS3080::update(uint32_t now) {
     uint8_t motion_reg;
     surface_quality = read_register(ADNS3080_SQUAL);
     hal.scheduler->delay_microseconds(50);
@@ -175,24 +172,22 @@ AP_OpticalFlow_ADNS3080::update(uint32_t now)
     motion_reg = read_register(ADNS3080_MOTION);
     // check if we've had an overflow
     _overflow = ((motion_reg & 0x10) != 0);
+    int16_t raw_dx, raw_dy;
     if( (motion_reg & 0x80) != 0 ) {
         raw_dx = ((int8_t)read_register(ADNS3080_DELTA_X));
         hal.scheduler->delay_microseconds(50);
         raw_dy = ((int8_t)read_register(ADNS3080_DELTA_Y));
         _motion = true;
-    }else{
+    } else {
         raw_dx = 0;
         raw_dy = 0;
     }
 
     last_update = hal.scheduler->millis();
-
-    apply_orientation_matrix();
+    apply_orientation_matrix(raw_dx, raw_dy);
 }
 
-void
-AP_OpticalFlow_ADNS3080::disable_serial_pullup()
-{
+void AP_OpticalFlow_ADNS3080::disable_serial_pullup() {
     uint8_t regVal = read_register(ADNS3080_EXTENDED_CONFIG);
     regVal = (regVal | ADNS3080_SERIALNPU_OFF);
     hal.scheduler->delay_microseconds(50);
@@ -203,7 +198,7 @@ AP_OpticalFlow_ADNS3080::disable_serial_pullup()
 // when required
 bool AP_OpticalFlow_ADNS3080::get_led_always_on()
 {
-    return ( (read_register(ADNS3080_CONFIGURATION_BITS) & 0x40) > 0 );
+    return ((read_register(ADNS3080_CONFIGURATION_BITS) & 0x40) > 0);
 }
 
 // set_led_always_on - set parameter to true if you want LED always on,
@@ -230,10 +225,10 @@ void AP_OpticalFlow_ADNS3080::set_resolution(uint16_t resolution)
 {
     uint8_t regVal = read_register(ADNS3080_CONFIGURATION_BITS);
 
-    if( resolution == ADNS3080_RESOLUTION_400 ) {
+    if(resolution == ADNS3080_RESOLUTION_400) {
         regVal &= ~0x10;
         scaler = AP_OPTICALFLOW_ADNS3080_SCALER;
-    }else if( resolution == ADNS3080_RESOLUTION_1600) {
+    } else if(resolution == ADNS3080_RESOLUTION_1600) {
         regVal |= 0x10;
         scaler = AP_OPTICALFLOW_ADNS3080_SCALER * 4;
     }
@@ -270,7 +265,7 @@ void AP_OpticalFlow_ADNS3080::set_frame_rate_auto(bool auto_frame_rate)
 
         // decide what value to update in extended config
         regVal = (regVal & ~0x01);
-    }else{
+    } else {
         // decide what value to update in extended config
         regVal = (regVal & ~0x01) | 0x01;
     }
@@ -326,7 +321,7 @@ bool AP_OpticalFlow_ADNS3080::get_shutter_speed_auto()
     uint8_t regVal = read_register(ADNS3080_EXTENDED_CONFIG);
     if( (regVal & 0x02) > 0 ) {
         return false;
-    }else{
+    } else {
         return true;
     }
 }
@@ -345,7 +340,7 @@ void AP_OpticalFlow_ADNS3080::set_shutter_speed_auto(bool auto_shutter_speed)
 
         // determine value to put into extended config
         regVal &= ~0x02;
-    }else{
+    } else {
         // determine value to put into extended config
         regVal |= 0x02;
     }
@@ -397,14 +392,13 @@ AP_OpticalFlow_ADNS3080::set_shutter_speed(uint16_t shutter_speed)
 }
 
 // clear_motion - will cause the Delta_X, Delta_Y, and internal motion
-// registers to be cleared
+// registers to be cleared.
+// Not used from ArduCopter.
 void AP_OpticalFlow_ADNS3080::clear_motion()
 {
     // writing anything to this register will clear the sensor's motion
     // registers
     write_register(ADNS3080_MOTION_CLEAR,0xFF); 
-    x = 0;
-    y = 0;
     dx = 0;
     dy = 0;
     _motion = false;

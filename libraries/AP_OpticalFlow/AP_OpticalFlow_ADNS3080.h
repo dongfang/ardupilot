@@ -23,7 +23,7 @@
 // ADNS3080 hardware config
 #define ADNS3080_PIXELS_X                 30
 #define ADNS3080_PIXELS_Y                 30
-#define ADNS3080_CLOCK_SPEED                      24000000
+#define ADNS3080_CLOCK_SPEED              24000000
 
 // Register Map for the ADNS3080 Optical OpticalFlow Sensor
 #define ADNS3080_PRODUCT_ID            0x00

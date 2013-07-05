@@ -674,7 +674,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { update_logging,         5,   1000 },
     { read_receiver_rssi,     5,   1000 },
     { check_long_failsafe,   15,   1000 },
-    { update_optical_flow,    5,   1000 },
+    { update_optical_flow,    1,   1000 },
 };
 
 // setup the var_info table
@@ -913,13 +913,30 @@ static void one_second_loop()
     }
 }
 
-// called at 20hz and data from sensor arrives at 20 Hz
-#if OPTFLOW == ENABLED
+// called at 100hz and data from sensor arrives at 10 Hz
 static void update_optical_flow(void) {
+#if OPTFLOW == ENABLED
+	static uint32_t last_of_update = 0;
+    static uint8_t of_log_counter = 0;
+
     // if new data has arrived, process it
-    //optflow.update_height(ahrs.roll, ahrs.pitch, pitchrate, rollrate, groundspeed);
-}
+    if(optflow.last_update != last_of_update) {
+    	// TODO: There is some vectoring to be done here. We should transform 
+    	// ground speed into local-forward and (maybe also) local-sideways parts
+    	// and (plane) use only the forward component for this.
+    	// Units: last_update is in ms. Ground speed is in cm/s.
+    	// [s/1000] * [m/100/s] = [m/100000]
+    	float dpf = (optflow.last_update-last_of_update) / 100000.0f * g_gps->ground_speed; 
+        last_of_update = optflow.last_update;
+        optflow.update_height(ahrs.roll, ahrs.pitch, dpf);
+        
+        if (of_log_counter++ == 10) {
+        	of_log_counter = 0;
+        	gcs_send_text_fmt(PSTR("Height over ground: %f"), optflow.height);
+        }
+    }
 #endif  // OPTFLOW == ENABLED
+}
 
 /*
   read the GPS and update position

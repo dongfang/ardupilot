@@ -56,20 +56,19 @@ public:
 
     // updates internal lon and lat with estimation based on optical flow
     virtual void    update_position(float roll, float pitch, float sin_yaw, float cos_yaw, float altitude);
+    virtual void    update_height(float roll, float pitch, float dpf);
 
     // public variables
-    int16_t  raw_dx;            // raw sensor change in x and y position (i.e. unrotated)
-    int16_t  raw_dy;            // raw sensor change in x and y position (i.e. unrotated)
     uint8_t  surface_quality;   // image quality (below 15 you really can't trust the x,y values returned)
-    int16_t  x,y;               // total x,y position
     int16_t  dx,dy;             // rotated change in x and y position
+    float 	 height;			// calculated height (ArduPlane, experimental)
     float    vlon, vlat;        // position as offsets from original position
     uint32_t last_update;       // millis() time of last update
     float    field_of_view;     // field of view in Radians
     float    scaler;            // number returned from sensor when moved one pixel
     int16_t  num_pixels;        // number of pixels of resolution in the sensor
 
-    // public variables for reporting purposes
+    // public variables for debugging purposes (TODO: Make locals where used).
     float    exp_change_x, exp_change_y;    // expected change in x, y coordinates
     float    change_x, change_y;            // actual change in x, y coordinates
     float    x_cm, y_cm;                    // x,y position in cm
@@ -85,9 +84,9 @@ protected:
     float radians_to_pixels;
     float _last_roll;
     float _last_pitch;
-    float _last_altitude;
+    float _last_height;
     // rotate raw values to arrive at final x,y,dx and dy values
-    virtual void apply_orientation_matrix();
+    virtual void apply_orientation_matrix(int16_t raw_dx, int16_t raw_dy);
     virtual void update_conversion_factors();
 
 private:
