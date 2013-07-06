@@ -169,8 +169,7 @@ static void init_ardupilot()
     // which serial ports should be inited, and added the SERIAL3_MODE define to decide
     // what kind of telemetry HW should be expected at the 2nd UART:
     // SERIAL3_MODE==DISABLED (0): Disabled.
-    // SERIAL3_MODE==ENALBED  (1): Raw MAVLink for a XBee or similar.
-    // SERIAL3_MODE==MOBILE   (2): DroneCell data-via-commands
+    // SERIAL3_MODE==ENABLED  (1): Raw MAVLink for a XBee or similar.
 
     #if SERIAL3_MODE == ENABLED
     // we have a 2nd serial port for telemetry
