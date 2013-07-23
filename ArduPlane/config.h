@@ -353,21 +353,6 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-// ENABLE_AIR_START
-//
-#ifndef ENABLE_AIR_START
- # define ENABLE_AIR_START               DISABLED
-#endif
-
-#ifndef AIR_START_FIX_COUNT
- # define AIR_START_FIX_COUNT               5
-#endif
-
-#ifndef GROUND_START_FIX_COUNT
- # define GROUND_START_FIX_COUNT               100
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
 // ENABLE ELEVON_MIXING
 //
 #ifndef ELEVON_MIXING
@@ -519,9 +504,6 @@
  # define SERVO_ROLL_INT_MAX   5
 #endif
 #define SERVO_ROLL_INT_MAX_CENTIDEGREE SERVO_ROLL_INT_MAX*100
-#ifndef ROLL_SLEW_LIMIT
- # define ROLL_SLEW_LIMIT      0
-#endif
 #ifndef SERVO_PITCH_P
  # define SERVO_PITCH_P        0.6
 #endif
@@ -614,9 +596,6 @@
 #ifndef THROTTLE_TE_INT_MAX
  # define THROTTLE_TE_INT_MAX  20
 #endif
-#ifndef THROTTLE_SLEW_LIMIT
- # define THROTTLE_SLEW_LIMIT  0
-#endif
 #ifndef PITCH_TARGET
  # define PITCH_TARGET         0
 #endif
@@ -652,10 +631,13 @@
     MASK_LOG_GPS | \
     MASK_LOG_PM | \
     MASK_LOG_NTUN | \
+    MASK_LOG_CTUN | \
     MASK_LOG_MODE | \
     MASK_LOG_CMD | \
     MASK_LOG_COMPASS | \
-    MASK_LOG_CURRENT
+    MASK_LOG_CURRENT | \
+    MASK_LOG_TECS | \
+    MASK_LOG_CAMERA
 
 
 

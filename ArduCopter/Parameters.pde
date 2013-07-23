@@ -191,17 +191,10 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(rssi_pin,            "RSSI_PIN",         -1),
 
-    // @Param: THR_ACC_ENABLE
-    // @DisplayName: Enable Accel based throttle controller
-    // @Description: This allows enabling and disabling the accelerometer based throttle controller.  If disabled a velocity based controller is used.
-    // @Values: 0:Disabled, 1:Enabled
-    // @User: Standard
-    GSCALAR(throttle_accel_enabled,  "THR_ACC_ENABLE",   1),
-
     // @Param: WP_YAW_BEHAVIOR
     // @DisplayName: Yaw behaviour during missions
     // @Description: Determines how the autopilot controls the yaw during missions and RTL
-    // @Values: 0:Never change yaw, 1:Face next waypoint, 2:Face next waypoint except RTL
+    // @Values: 0:Never change yaw, 1:Face next waypoint, 2:Face next waypoint except RTL, 3:Face along GPS course
     // @User: Advanced
     GSCALAR(wp_yaw_behavior,  "WP_YAW_BEHAVIOR",    WP_YAW_BEHAVIOR_DEFAULT),
 
@@ -283,7 +276,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: FS_THR_ENABLE
     // @DisplayName: Throttle Failsafe Enable
     // @Description: The throttle failsafe allows you to configure a software failsafe activated by a setting on the throttle input channel
-    // @Values: 0:Disabled,1:Enabled always RTL,2:Enabled Continue with Mission in Auto Mode
+    // @Values: 0:Disabled,1:Enabled always RTL,2:Enabled Continue with Mission in Auto Mode,3:Enabled always LAND
     // @User: Standard
     GSCALAR(failsafe_throttle,  "FS_THR_ENABLE",   FS_THR_DISABLED),
 
@@ -385,7 +378,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @DisplayName: Channel 6 Tuning
     // @Description: Controls which parameters (normally PID gains) are being tuned with transmitter's channel 6 knob
     // @User: Standard
-    // @Values: 0:CH6_NONE,1:CH6_STABILIZE_KP,2:CH6_STABILIZE_KI,3:CH6_YAW_KP,4:CH6_RATE_KP,5:CH6_RATE_KI,6:CH6_YAW_RATE_KP,7:CH6_THROTTLE_KP,9:CH6_RELAY,10:CH6_WP_SPEED,12:CH6_LOITER_KP,13:CH6_HELI_EXTERNAL_GYRO,14:CH6_THR_HOLD_KP,17:CH6_OPTFLOW_KP,18:CH6_OPTFLOW_KI,19:CH6_OPTFLOW_KD,21:CH6_RATE_KD,22:CH6_LOITER_RATE_KP,23:CH6_LOITER_RATE_KD,24:CH6_YAW_KI,25:CH6_ACRO_KP,26:CH6_YAW_RATE_KD,27:CH6_LOITER_KI,28:CH6_LOITER_RATE_KI,29:CH6_STABILIZE_KD,30:CH6_AHRS_YAW_KP,31:CH6_AHRS_KP,32:CH6_INAV_TC,33:CH6_THROTTLE_KI,34:CH6_THR_ACCEL_KP,35:CH6_THR_ACCEL_KI,36:CH6_THR_ACCEL_KD,38:CH6_DECLINATION,39:CH6_CIRCLE_RATE
+    // @Values: 0:None,1:Stab Roll/Pitch kP,4:Rate Roll/Pitch kP,5:Rate Roll/Pitch kI,21:Rate Roll/Pitch kD,3:Stab Yaw kP,6:Rate Yaw kP,26:Rate Yaw kD,14:Altitude Hold kP,7:Throttle Rate kP,37:Throttle Rate kD,34:Throttle Accel kP,35:Throttle Accel kI,36:Throttle Accel kD,12:Loiter Pos kP,22:Loiter Rate kP,28:Loiter Rate kI,23:Loiter Rate kD,10:WP Speed,25:Acro kP,9:Relay On/Off,13:Heli Ext Gyro,17:OF Loiter kP,18:OF Loiter kI,19:OF Loiter kD,30:AHRS Yaw kP,31:AHRS kP,32:INAV_TC,38:Declination,39:Circle Rate
     GSCALAR(radio_tuning, "TUNE",                   0),
 
     // @Param: TUNE_LOW
@@ -741,7 +734,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Description: Throttle rate controller D gain.  Compensates for short-term change in desired vertical speed vs actual speed
     // @Range: 0.000 0.400
     // @User: Standard
-    GGROUP(pid_throttle,      "THR_RATE_", AC_PID),
+    GGROUP(pid_throttle_rate, "THR_RATE_", AC_PID),
 
     // @Param: THR_ACCEL_P
     // @DisplayName: Throttle acceleration controller P gain
@@ -970,8 +963,8 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/AP_InertialNav/AP_InertialNav.cpp
     GOBJECT(inertial_nav,           "INAV_",    AP_InertialNav),
 
-    //@Group: WPNAV_
-    //@Path: ../libraries/AC_WPNav/AC_WPNav.cpp
+    // @Group: WPNAV_
+    // @Path: ../libraries/AC_WPNav/AC_WPNav.cpp
     GOBJECT(wp_nav, "WPNAV_",       AC_WPNav),
 
     // @Group: SR0_
@@ -1011,8 +1004,8 @@ const AP_Param::Info var_info[] PROGMEM = {
     GOBJECT(scheduler, "SCHED_", AP_Scheduler),
 
 #if AC_FENCE == ENABLED
-    //@Group: FENCE_
-    //@Path: ../libraries/AC_Fence/AC_Fence.cpp
+    // @Group: FENCE_
+    // @Path: ../libraries/AC_Fence/AC_Fence.cpp
     GOBJECT(fence,      "FENCE_",   AC_Fence),
 #endif
 
@@ -1077,7 +1070,6 @@ static void load_parameters(void)
 
         // save the current format version
         g.format_version.set_and_save(Parameters::k_format_version);
-        default_dead_zones();
         cliSerial->println_P(PSTR("done."));
     } else {
         uint32_t before = micros();
