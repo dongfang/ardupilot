@@ -42,13 +42,6 @@ static void update_auto()
     }
 }
 
-// this is only used by an air-start
-static void reload_commands_airstart()
-{
-    init_commands();
-    decrement_cmd_index();
-}
-
 /*
   fetch a mission item from EEPROM
 */
@@ -135,13 +128,6 @@ static void set_cmd_with_index(struct Location temp, int16_t i)
 
     mem += 4;
     hal.storage->write_dword(mem, temp.lng);
-}
-
-static void decrement_cmd_index()
-{
-    if (g.command_index > 0) {
-        g.command_index.set_and_save(g.command_index - 1);
-    }
 }
 
 static int32_t read_alt_to_hold()
@@ -252,9 +238,8 @@ void init_home()
     home.id         = MAV_CMD_NAV_WAYPOINT;
     home.lng        = g_gps->longitude;                                 // Lon * 10**7
     home.lat        = g_gps->latitude;                                  // Lat * 10**7
-    
     // This is not so good if you fly in a depression where alt < 0.
-    home.alt        = max(g_gps->altitude, 0);
+    home.alt        = max(g_gps->altitude_cm, 0);
     home_is_set = true;
 
     gcs_send_text_fmt(PSTR("gps alt: %lu"), (unsigned long)home.alt);

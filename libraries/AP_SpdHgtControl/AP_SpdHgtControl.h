@@ -28,8 +28,8 @@ public:
 		AP_Int8 throttle_max;	
 		AP_Int8 throttle_slewrate;
 		AP_Int8 throttle_cruise;
-		AP_Int16 flybywire_airspeed_min;
-		AP_Int16 flybywire_airspeed_max;
+		AP_Int16 airspeed_min;
+		AP_Int16 airspeed_max;
 		AP_Int16 pitch_limit_max_cd;
 		AP_Int16 pitch_limit_min_cd;
 	};
@@ -37,11 +37,16 @@ public:
 	// Update the internal state of the height and height rate estimator
 	// Update of the inertial speed rate estimate internal state
 	// Should be called at 50Hz or faster
-	virtual void update_50hz(void) = 0;
+	virtual void update_50hz(float height_above_field) = 0;
 
 	// Update of the pitch and throttle demands
 	// Should be called at 10Hz or faster
-	virtual void update_pitch_throttle(int32_t hgt_dem_cm, int32_t EAS_dem_cm, bool climbOutDem, int32_t ptchMinCO_cd) = 0;
+	virtual void update_pitch_throttle( int32_t hgt_dem_cm,
+										int32_t EAS_dem_cm,
+										bool climbOutDem,
+										int32_t ptchMinCO_cd,
+										int16_t throttle_nudge,
+                                        float hgt_afe) = 0;
 
 	// demanded throttle in percentage
 	// should return 0 to 100
