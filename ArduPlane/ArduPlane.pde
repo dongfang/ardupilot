@@ -1043,7 +1043,7 @@ static void update_GPS(void)
  * Calls calc_throttle(), which in turn updates channel_throttle->servo_out.
  * In mode MANUAL, this does a strange thing: Updates RCChannel output values
  * directly (channel_xxx->servo_out = channel_xxx->pwm_to_angle();)
- * This is called from fast loop before stabilize() and before set_servos().
+ * This is called from scheduler asynchronously at 50Hz
  */
 static void update_flight_mode(void)
 {
@@ -1181,25 +1181,34 @@ static void update_flight_mode(void)
         }
 
         case FLY_BY_WIRE_A: {
-            // set nav_roll and nav_pitch using sticks
-            // dongfang: Is this necessary? norm_input() should not return more than +-1.
+            // Set the demanded-roll angle proportional to stick deflection.
             nav_roll_cd  = channel_roll->norm_input() * g.roll_limit_cd;
+            
+            // dongfang: Is this necessary? norm_input() should not return more than +-1.
             nav_roll_cd = constrain_int32(nav_roll_cd, -g.roll_limit_cd, g.roll_limit_cd);
+            
             float pitch_input = channel_pitch->norm_input();
+
+            // Set the demanded-pitch angle proportional to stick deflection.
             if (pitch_input > 0) {
                 nav_pitch_cd = pitch_input * aparm.pitch_limit_max_cd;
             } else {
                 nav_pitch_cd = -(pitch_input * aparm.pitch_limit_min_cd);
             }
+            
+            // dongfang: Is this necessary? norm_input() should not return more than +-1.
             nav_pitch_cd = constrain_int32(nav_pitch_cd, aparm.pitch_limit_min_cd.get(), aparm.pitch_limit_max_cd.get());
+            
             if (inverted_flight) {
                 nav_pitch_cd = -nav_pitch_cd;
             }
+            
             break;
         }
 
         case FLY_BY_WIRE_B:
             // Thanks to Yury MonZon for the altitude limit code!
+        	// Set the demanded-roll angle proportional to stick deflection.
             nav_roll_cd = channel_roll->norm_input() * g.roll_limit_cd;
             update_fbwb_speed_height();
             break;

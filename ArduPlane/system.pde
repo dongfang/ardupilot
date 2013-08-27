@@ -459,7 +459,7 @@ static void startup_INS_ground(bool do_accel_init)
 
         // Makes the servos wiggle twice - about to begin INS calibration - HOLD LEVEL AND STILL!!
         // -----------------------
-        demo_servos(2);
+        // demo_servos(2);
 
         gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Beginning INS calibration; do not move plane"));
         mavlink_delay(1000);
@@ -588,6 +588,8 @@ void flash_leds(bool on)
 
 /*
  * Read Vcc vs 1.1v internal reference
+ * With some +-1 noise reading that, the resulting voltage (in millivolts) will have noise:
+ * +-1*5.5/1.1 = +-4.4mV
  */
 uint16_t board_voltage(void)
 {
