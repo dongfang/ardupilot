@@ -1,4 +1,5 @@
 #!/bin/bash
+#test
 DIR=$1
 COMMIT=$2
 
