@@ -16,6 +16,7 @@
 #include <AP_ADC.h>
 #include <AP_InertialSensor.h>
 #include <GCS_MAVLink.h>
+#include <AP_Notify.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_APM2
 #define A_LED_PIN 27
@@ -96,7 +97,7 @@ void loop(void)
         }
 
         if( user_input == 'r' || user_input == 'R' ) {
-			hal.scheduler->reboot();
+			hal.scheduler->reboot(false);
         }
     }
 }

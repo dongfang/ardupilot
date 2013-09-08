@@ -17,6 +17,7 @@
 #include <AP_ADC.h>
 #include <AP_InertialSensor.h>
 #include <GCS_MAVLink.h>
+#include <AP_Notify.h>
 
 const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 
@@ -78,7 +79,7 @@ void loop(void)
         }
 
         if( user_input == 'r' || user_input == 'R' ) {
-			hal.scheduler->reboot();
+			hal.scheduler->reboot(false);
         }
     }
 }

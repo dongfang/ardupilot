@@ -3,7 +3,6 @@
 export PATH=$HOME/.local/bin:/usr/local/bin:$HOME/prefix/bin:$HOME/APM/px4/gcc-arm-none-eabi-4_6-2012q2/bin:$PATH
 export PYTHONUNBUFFERED=1
 export PYTHONPATH=$HOME/APM
-export PX4_ROOT=$HOME/APM/px4/PX4Firmware
 
 cd $HOME/APM || exit 1
 
@@ -83,20 +82,31 @@ popd
 
 rsync -a APM/Tools/autotest/web-firmware/ buildlogs/binaries/
 
-pushd px4/PX4Firmware
+pushd PX4Firmware
 git fetch origin
 git reset --hard origin/master
+git show
+popd
+
+pushd PX4NuttX
+git fetch origin
+git reset --hard origin/master
+git show
 popd
 
 echo "Updating pymavlink"
 pushd mavlink/pymavlink
-git pr
+git fetch origin
+git reset --hard origin/master
+git show
 python setup.py build install --user
 popd
 
 echo "Updating MAVProxy"
 pushd MAVProxy
-git pr
+git fetch origin
+git reset --hard origin/master
+git show
 python setup.py build install --user
 popd
 
