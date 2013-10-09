@@ -1,11 +1,21 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 //	Initial Code by Jon Challinger
 //  Modified by Paul Riseborough
-//	This library is free software; you can redistribute it and / or
-//	modify it under the terms of the GNU Lesser General Public
-//	License as published by the Free Software Foundation; either
-//	version 2.1 of the License, or (at your option) any later version.
 
 #include <AP_Math.h>
 #include <AP_HAL.h>
@@ -167,8 +177,12 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 */
 int32_t AP_PitchController::get_rate_out(float desired_rate, float scaler)
 {
-	// With the zero as airspeed, it appears integration is off.
-    return _get_rate_out(desired_rate, scaler, false, 0);
+    float aspeed;
+	if (!_ahrs.airspeed_estimate(&aspeed)) {
+	    // If no airspeed available use average of min and max
+        aspeed = 0.5f*(float(aparm.airspeed_min) + float(aparm.airspeed_max));
+	}
+    return _get_rate_out(desired_rate, scaler, false, aspeed);
 }
 
 /*
@@ -209,17 +223,6 @@ float AP_PitchController::_get_coordination_rate_offset(float &aspeed, bool &inv
 		rate_offset = -rate_offset;
 	}
     return rate_offset;
-}
-
-/*
-  get the rate offset in degrees/second needed for pitch in body frame
-  to maintain height in a coordinated turn.
- */
-float AP_PitchController::get_coordination_rate_offset(void) const
-{
-    float aspeed;
-    bool inverted;
-    return _get_coordination_rate_offset(aspeed, inverted);
 }
 
 // Function returns an equivalent elevator deflection in centi-degrees in the range from -4500 to 4500

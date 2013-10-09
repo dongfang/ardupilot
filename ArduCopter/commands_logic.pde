@@ -237,7 +237,7 @@ static void do_takeoff()
     set_yaw_mode(YAW_HOLD);
 
     // set throttle mode to AUTO although we should already be in this mode
-    set_throttle_mode(THROTTLE_AUTO);
+    set_throttle_mode(AUTO_THR);
 
     // set our nav mode to loiter
     set_nav_mode(NAV_WP);
@@ -260,7 +260,7 @@ static void do_nav_wp()
     set_roll_pitch_mode(AUTO_RP);
 
     // set throttle mode
-    set_throttle_mode(THROTTLE_AUTO);
+    set_throttle_mode(AUTO_THR);
 
     // set nav mode
     set_nav_mode(NAV_WP);
@@ -303,7 +303,7 @@ static void do_land(const struct Location *cmd)
         set_yaw_mode(get_wp_yaw_mode(false));
 
         // set throttle mode
-        set_throttle_mode(THROTTLE_AUTO);
+        set_throttle_mode(AUTO_THR);
 
         // set nav mode
         set_nav_mode(NAV_WP);
@@ -354,7 +354,7 @@ static void do_loiter_unlimited()
     set_roll_pitch_mode(AUTO_RP);
 
     // set throttle mode to AUTO which, if not already active, will default to hold at our current altitude
-    set_throttle_mode(THROTTLE_AUTO);
+    set_throttle_mode(AUTO_THR);
 
     // hold yaw
     set_yaw_mode(YAW_HOLD);
@@ -387,7 +387,7 @@ static void do_circle()
     set_roll_pitch_mode(AUTO_RP);
 
     // set throttle mode to AUTO which, if not already active, will default to hold at our current altitude
-    set_throttle_mode(THROTTLE_AUTO);
+    set_throttle_mode(AUTO_THR);
 
     // set nav mode to CIRCLE
     set_nav_mode(NAV_CIRCLE);
@@ -422,7 +422,7 @@ static void do_loiter_time()
     set_roll_pitch_mode(AUTO_RP);
 
     // set throttle mode to AUTO which, if not already active, will default to hold at our current altitude
-    set_throttle_mode(THROTTLE_AUTO);
+    set_throttle_mode(AUTO_THR);
 
     // hold yaw
     set_yaw_mode(YAW_HOLD);
@@ -655,7 +655,7 @@ static bool verify_RTL()
             // check if we've loitered long enough
             if( millis() - rtl_loiter_start_time > (uint32_t)g.rtl_loiter_time.get() ) {
                 // initiate landing or descent
-                if(g.rtl_alt_final == 0 || ap.failsafe_radio) {
+                if(g.rtl_alt_final == 0 || failsafe.radio) {
                     // switch to loiter which restores horizontal control to pilot
                     // To-Do: check that we are not in failsafe to ensure we don't process bad roll-pitch commands
                     set_roll_pitch_mode(ROLL_PITCH_LOITER);
@@ -797,7 +797,6 @@ static bool verify_change_alt()
 
 static bool verify_within_distance()
 {
-    //cliSerial->printf("cond dist :%d\n", (int)condition_value);
     if (wp_distance < max(condition_value,0)) {
         condition_value = 0;
         return true;
@@ -864,27 +863,20 @@ static void do_jump()
     // when in use, it contains the current remaining jumps
     static int8_t jump = -10;                                                                   // used to track loops in jump command
 
-    //cliSerial->printf("do Jump: %d\n", jump);
-
     if(jump == -10) {
-        //cliSerial->printf("Fresh Jump\n");
         // we use a locally stored index for jump
         jump = command_cond_queue.lat;
     }
-    //cliSerial->printf("Jumps left: %d\n",jump);
 
     if(jump > 0) {
-        //cliSerial->printf("Do Jump to %d\n",command_cond_queue.p1);
         jump--;
         change_command(command_cond_queue.p1);
 
     } else if (jump == 0) {
-        //cliSerial->printf("Did last jump\n");
         // we're done, move along
         jump = -11;
 
     } else if (jump == -1) {
-        //cliSerial->printf("jumpForever\n");
         // repeat forever
         change_command(command_cond_queue.p1);
     }

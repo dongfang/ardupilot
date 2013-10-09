@@ -31,6 +31,9 @@
 #include <AP_Camera.h>          // Photo or video camera
 #include <AP_Mount.h>           // Camera/Antenna mount
 #include <AP_Airspeed.h>        // needed for AHRS build
+#include <AP_Vehicle.h>         // needed for AHRS build
+#include <AP_Notify.h>
+#include <DataFlash.h>
 #include <AP_InertialNav.h>     // ArduPilot Mega inertial navigation library
 #include <GCS_MAVLink.h>
 #include <memcheck.h>
@@ -115,20 +118,6 @@ void setup(void)
     hal.console->println("loopback for 10sec:");
     stream_loopback(hal.console, 10000);
     hal.console->println("loopback done");
-
-    hal.console->println("opening backend:");
-    
-    hal.console->backend_open();
-
-    const char hello[] = "hello world\r\n";
-    hal.console->backend_write((const uint8_t*)hello, strlen(hello));
-
-    hal.console->println("loopback for 10sec:");
-    stream_console_loopback(hal.console, hal.console, 10000);
-    hal.console->println("loopback done");
-
-    hal.console->backend_close();
-    hal.console->println("closed backend.");
 
     hal.console->println("done.");
     for(;;);

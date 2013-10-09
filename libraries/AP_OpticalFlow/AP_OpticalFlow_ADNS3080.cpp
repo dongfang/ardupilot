@@ -1,12 +1,22 @@
 /*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
  *       AP_OpticalFlow_ADNS3080.cpp - ADNS3080 OpticalFlow Library for
  *       Ardupilot Mega
  *       Code by Randy Mackay. DIYDrones.com
- *
- *       This library is free software; you can redistribute it and/or
- *   modify it under the terms of the GNU Lesser General Public
- *   License as published by the Free Software Foundation; either
- *   version 2.1 of the License, or (at your option) any later version.
  *
  */
 
@@ -91,8 +101,8 @@ AP_OpticalFlow_ADNS3080::init()
 finish:
     // if device is working register the global static read function to
     // be called at 1khz
-    if(retvalue) {
-        hal.scheduler->register_timer_process( AP_OpticalFlow_ADNS3080::read );
+    if( retvalue ) {
+        hal.scheduler->register_timer_process(AP_HAL_MEMBERPROC(&AP_OpticalFlow_ADNS3080::read));
     }
 
     // resume timer
@@ -184,7 +194,7 @@ AP_OpticalFlow_ADNS3080::reset()
 
 // read latest values from sensor and fill in x,y and totals
 // Is supposed to happen at 20Hz (or whatever divider is used in read() in superclass)
-void AP_OpticalFlow_ADNS3080::update(uint32_t now) {
+void AP_OpticalFlow_ADNS3080::update(void) {
     uint8_t motion_reg;
     surface_quality = read_register(ADNS3080_SQUAL);
     hal.scheduler->delay_microseconds(50);
@@ -452,7 +462,7 @@ void AP_OpticalFlow_ADNS3080::print_pixel_data()
             }
             isFirstPixel = false;
             pixelValue = ( regValue << 2 );
-            hal.console->print(pixelValue,DEC);
+            hal.console->print(pixelValue,BASE_DEC);
             if( j!= ADNS3080_PIXELS_X-1 )
                 hal.console->print_P(PSTR(","));
             hal.scheduler->delay_microseconds(50);

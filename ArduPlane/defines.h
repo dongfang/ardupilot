@@ -198,7 +198,6 @@ enum log_messages {
 // Climb rate calculations
 #define ALTITUDE_HISTORY_LENGTH 8       //Number of (time,altitude) points to
                                         // regress a climb rate from
-
 // Dongfang addition: If an APM is on a very good supply, then this scaling to internal reference
 // that was added to the code degrades ADC performance. By defining ANALOG_RATIOMETRIC, the
 // battery volts and current measurement will not use the internal reference but trust that the
@@ -232,7 +231,12 @@ enum log_messages {
 #define FENCE_WP_SIZE sizeof(Vector2l)
 #define FENCE_START_BYTE (EEPROM_MAX_ADDR-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
 
-#define MAX_WAYPOINTS  ((FENCE_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
+// rally points shoehorned between fence points and waypoints
+#define MAX_RALLYPOINTS 10
+#define RALLY_WP_SIZE 15
+#define RALLY_START_BYTE (FENCE_START_BYTE-(MAX_RALLYPOINTS*RALLY_WP_SIZE))
+
+#define MAX_WAYPOINTS  ((RALLY_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
                                                                           // 1
                                                                           // to
                                                                           // be
@@ -248,8 +252,10 @@ enum log_messages {
 // InertialSensor driver types
 #define CONFIG_INS_OILPAN  1
 #define CONFIG_INS_MPU6000 2
-#define CONFIG_INS_STUB    3
+#define CONFIG_INS_HIL     3
 #define CONFIG_INS_PX4     4
+#define CONFIG_INS_FLYMAPLE 5
+#define CONFIG_INS_L3G4200D 6
 
 // barometer driver types
 #define AP_BARO_BMP085   1
