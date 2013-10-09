@@ -189,16 +189,6 @@ static void init_ardupilot()
     // give AHRS the airspeed sensor
     ahrs.set_airspeed(&airspeed);
 
-    // init the optical flow sensor
-    if(g.optflow_enabled) {
-        init_optflow();
-    }
-    
-    // the axis controllers need access to the AHRS system
-    g.rollController.set_ahrs(&ahrs);
-    g.pitchController.set_ahrs(&ahrs);
-    g.yawController.set_ahrs(&ahrs);
-
 	// Do GPS init
 	g_gps = &g_gps_driver;
     // GPS Initialization
@@ -221,6 +211,10 @@ static void init_ardupilot()
     digitalWrite(FENCE_TRIGGERED_PIN, LOW);
 #endif
 
+#if OPTFLOW == ENABLED
+    init_optflow();
+#endif
+    
     /*
      *  setup the 'main loop is dead' check. Note that this relies on
      *  the RC library being initialised.
@@ -388,9 +382,9 @@ static void set_mode(enum FlightMode mode)
         Log_Write_Mode(control_mode);
 
     // reset attitude integrators on mode change
-    g.rollController.reset_I();
-    g.pitchController.reset_I();
-    g.yawController.reset_I();    
+    rollController.reset_I();
+    pitchController.reset_I();
+    yawController.reset_I();    
 }
 
 static void check_long_failsafe()
@@ -598,6 +592,8 @@ void flash_leds(bool on)
 
 /*
  * Read Vcc vs 1.1v internal reference
+ * With some +-1 noise reading that, the resulting voltage (in millivolts) will have noise:
+ * +-1*5.5/1.1 = +-4.4mV
  */
 uint16_t board_voltage(void)
 {

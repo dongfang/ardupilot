@@ -353,13 +353,30 @@ static bool mode_requires_GPS(uint8_t mode) {
     return false;
 }
 
+// manual_flight_mode - returns true if flight mode is completely manual (i.e. roll, pitch and yaw controlled by pilot)
+static bool manual_flight_mode(uint8_t mode) {
+    switch(mode) {
+        case ACRO:
+        case STABILIZE:
+        case TOY_A:
+        case TOY_M:
+        case SPORT:
+            return true;
+        default:
+            return false;
+    }
+
+    return false;
+}
+
 // set_mode - change flight mode and perform any necessary initialisation
 // returns true if mode was succesfully set
-// STABILIZE, ACRO and LAND can always be set successfully but the return state of other flight modes should be checked and the caller should deal with failures appropriately
+// STABILIZE, ACRO, SPORT and LAND can always be set successfully but the return state of other flight modes should be checked and the caller should deal with failures appropriately
 static bool set_mode(uint8_t mode)
 {
     // boolean to record if flight mode could be set
     bool success = false;
+    bool ignore_checks = !motors.armed();   // allow switching to any mode if disarmed.  We rely on the arming check to perform
 
     // report the GPS and Motor arming status
     // To-Do: this should be initialised somewhere else related to the LEDs
@@ -374,12 +391,10 @@ static bool set_mode(uint8_t mode)
             set_roll_pitch_mode(ACRO_RP);
             set_throttle_mode(ACRO_THR);
             set_nav_mode(NAV_NONE);
-            // reset acro axis targets to current attitude
-            if(g.axis_enabled){
-                roll_axis   = 0;
-                pitch_axis  = 0;
-                nav_yaw     = 0;
-            }
+            // reset acro level rates
+            acro_roll_rate = 0;
+            acro_pitch_rate = 0;
+            acro_yaw_rate = 0;
             break;
 
         case STABILIZE:
@@ -404,7 +419,7 @@ static bool set_mode(uint8_t mode)
 
         case AUTO:
             // check we have a GPS and at least one mission command (note the home position is always command 0)
-            if (GPS_ok() && g.command_total > 1) {
+            if ((GPS_ok() && g.command_total > 1) || ignore_checks) {
                 success = true;
                 ap.manual_throttle = false;
                 ap.manual_attitude = false;
@@ -414,7 +429,7 @@ static bool set_mode(uint8_t mode)
             break;
 
         case CIRCLE:
-            if (GPS_ok()) {
+            if (GPS_ok() || ignore_checks) {
                 success = true;
                 ap.manual_throttle = false;
                 ap.manual_attitude = false;
@@ -426,7 +441,7 @@ static bool set_mode(uint8_t mode)
             break;
 
         case LOITER:
-            if (GPS_ok()) {
+            if (GPS_ok() || ignore_checks) {
                 success = true;
                 ap.manual_throttle = false;
                 ap.manual_attitude = false;
@@ -438,7 +453,7 @@ static bool set_mode(uint8_t mode)
             break;
 
         case POSITION:
-            if (GPS_ok()) {
+            if (GPS_ok() || ignore_checks) {
                 success = true;
                 ap.manual_throttle = true;
                 ap.manual_attitude = false;
@@ -450,7 +465,7 @@ static bool set_mode(uint8_t mode)
             break;
 
         case GUIDED:
-            if (GPS_ok()) {
+            if (GPS_ok() || ignore_checks) {
                 success = true;
                 ap.manual_throttle = false;
                 ap.manual_attitude = false;
@@ -470,7 +485,7 @@ static bool set_mode(uint8_t mode)
             break;
 
         case RTL:
-            if (GPS_ok()) {
+            if (GPS_ok() || ignore_checks) {
                 success = true;
                 ap.manual_throttle = false;
                 ap.manual_attitude = false;
@@ -479,7 +494,7 @@ static bool set_mode(uint8_t mode)
             break;
 
         case OF_LOITER:
-            if (g.optflow_enabled) {
+            if (g.optflow_enabled || ignore_checks) {
                 success = true;
                 ap.manual_throttle = false;
                 ap.manual_attitude = false;
@@ -514,6 +529,20 @@ static bool set_mode(uint8_t mode)
             set_roll_pitch_mode(ROLL_PITCH_TOY);
             set_nav_mode(NAV_NONE);
             set_throttle_mode(THROTTLE_HOLD);
+            break;
+
+        case SPORT:
+            success = true;
+            ap.manual_throttle = true;
+            ap.manual_attitude = true;
+            set_yaw_mode(SPORT_YAW);
+            set_roll_pitch_mode(SPORT_RP);
+            set_throttle_mode(SPORT_THR);
+            set_nav_mode(NAV_NONE);
+            // reset acro angle targets to current attitude
+            acro_roll = ahrs.roll_sensor;
+            acro_pitch = ahrs.pitch_sensor;
+            nav_yaw = ahrs.yaw_sensor;
             break;
 
         default:
@@ -558,7 +587,7 @@ static void update_auto_armed()
             return;
         }
         // if in stabilize or acro flight mode and throttle is zero, auto-armed should become false
-        if(control_mode <= ACRO && g.rc_3.control_in == 0 && !ap.failsafe_radio) {
+        if(manual_flight_mode(control_mode) && g.rc_3.control_in == 0 && !ap.failsafe_radio) {
             set_auto_armed(false);
         }
     }else{
@@ -678,6 +707,9 @@ print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode)
         break;
     case TOY_A:
         port->print_P(PSTR("TOY_A"));
+        break;
+    case SPORT:
+        port->print_P(PSTR("SPORT"));
         break;
     default:
         port->printf_P(PSTR("Mode(%u)"), (unsigned)mode);

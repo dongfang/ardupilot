@@ -105,6 +105,7 @@ static void init_optflow()
         cliSerial->print_P(PSTR("\nFailed to Init OptFlow "));
         // Log_Write_Error(ERROR_SUBSYSTEM_OPTFLOW,ERROR_CODE_FAILED_TO_INITIALISE);
     } else {
+        cliSerial->print_P(PSTR("\nOptFlow Init OK"));
         // suspend timer while we set-up SPI communication
         hal.scheduler->suspend_timer_procs();
         optflow.set_orientation(OPTFLOW_ORIENTATION);   // set optical flow sensor's orientation on aircraft

@@ -143,7 +143,7 @@ void AP_OpticalFlow::update_height(float roll, float pitch, float dpf)
 
         // real estimated raw change from mouse
         // change_x = dx - exp_change_x;
-        change_y = dy - exp_change_y;
+        change_y = -dy - exp_change_y;
 
         if (change_y > 0) {
         	height = dpf / (change_y * conv_factor);

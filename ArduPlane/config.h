@@ -20,6 +20,10 @@
 // - Try to keep this file organised in the same order as APM_Config.h.example
 //
 
+#ifndef ANALOG_RATIOMETRIC
+  #define ANALOG_RATIOMETRIC 1
+#endif
+
 #include "defines.h"
 
 ///
@@ -104,6 +108,7 @@
  # define C_LED_PIN        25
  # define LED_ON           LOW
  # define LED_OFF          HIGH
+ # define USB_MUX_PIN 23
 
  # define BATTERY_VOLT_PIN      1      // Battery voltage on A1
  # define BATTERY_CURR_PIN      2      // Battery current on A2
@@ -278,10 +283,10 @@
  # define FLIGHT_MODE_2                  RTL
 #endif
 #if !defined(FLIGHT_MODE_3)
- # define FLIGHT_MODE_3                  STABILIZE
+ # define FLIGHT_MODE_3                  FLY_BY_WIRE_A
 #endif
 #if !defined(FLIGHT_MODE_4)
- # define FLIGHT_MODE_4                  STABILIZE
+ # define FLIGHT_MODE_4                  FLY_BY_WIRE_A
 #endif
 #if !defined(FLIGHT_MODE_5)
  # define FLIGHT_MODE_5                  MANUAL
@@ -422,7 +427,7 @@
 // FLY_BY_WIRE_B airspeed control
 //
 #ifndef AIRSPEED_FBW_MIN
- # define AIRSPEED_FBW_MIN               6
+ # define AIRSPEED_FBW_MIN               9
 #endif
 #ifndef AIRSPEED_FBW_MAX
  # define AIRSPEED_FBW_MAX               22
@@ -701,7 +706,7 @@
 #endif
 
 #ifndef SERIAL_BUFSIZE
- # define SERIAL_BUFSIZE 256
+ # define SERIAL_BUFSIZE 512
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -713,7 +718,7 @@
  # define OPTFLOW                       DISABLED
 #endif
 #ifndef OPTFLOW_ORIENTATION
- # define OPTFLOW_ORIENTATION    AP_OPTICALFLOW_ADNS3080_PINS_FORWARD
+ # define OPTFLOW_ORIENTATION    AP_OPTICALFLOW_ADNS3080_PINS_BACK
 #endif
 #ifndef OPTFLOW_RESOLUTION
  # define OPTFLOW_RESOLUTION     ADNS3080_RESOLUTION_1600
