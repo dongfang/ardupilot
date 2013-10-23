@@ -1,4 +1,4 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: t -*-
+// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 //
 // Simple commandline menu system.
@@ -39,7 +39,7 @@ Menu::run(void)
     uint8_t len, i;
     uint8_t argc;
     int c;
-    char *s;
+    char *s = NULL;
 
 	if (_port == NULL) {
 		// default to main serial port
@@ -58,10 +58,12 @@ Menu::run(void)
         _port->printf_P(PSTR("%S] "), FPSTR(_prompt));
         for (;; ) {
             c = _port->read();
-            if (-1 == c)
+            if (-1 == c) {
+                hal.scheduler->delay(20);
                 continue;
+            }
             // carriage return -> process command
-            if ('\r' == c) {
+            if ('\r' == c || '\n' == c) {
                 _inbuf[len] = '\0';
                 _port->write('\r');
                 _port->write('\n');
@@ -87,6 +89,7 @@ Menu::run(void)
 
         // split the input line into tokens
         argc = 0;
+		s = NULL;
         _argv[argc++].str = strtok_r(_inbuf, " ", &s);
         // XXX should an empty line by itself back out of the current menu?
         while (argc <= MENU_ARGS_MAX) {

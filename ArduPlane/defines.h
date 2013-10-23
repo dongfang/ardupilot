@@ -18,12 +18,12 @@
 
 // failsafe
 // ----------------------
-#define FAILSAFE_NONE   0
-#define FAILSAFE_SHORT  1
-#define FAILSAFE_LONG   2
-#define FAILSAFE_GCS    3
-#define FAILSAFE_SHORT_TIME 1500        // Miliiseconds
-#define FAILSAFE_LONG_TIME  20000       // Miliiseconds
+enum failsafe_state {
+    FAILSAFE_NONE=0,
+    FAILSAFE_SHORT=1,
+    FAILSAFE_LONG=2,
+    FAILSAFE_GCS=3
+};
 
 
 // active altitude sensor
@@ -48,13 +48,9 @@
 #define GPS_PROTOCOL_MTK19      6
 #define GPS_PROTOCOL_AUTO       7
 
-#define CH_ROLL CH_1
-#define CH_PITCH CH_2
-#define CH_THROTTLE CH_3
-#define CH_RUDDER CH_4
-#define CH_YAW CH_4
-
-// HIL enumerations
+// HIL enumerations. Note that HIL_MODE_ATTITUDE and HIL_MODE_SENSORS
+// are now the same thing, and are sensors based. The old define is
+// kept to allow old APM_Config.h headers to keep working
 #define HIL_MODE_DISABLED                       0
 #define HIL_MODE_ATTITUDE                       1
 #define HIL_MODE_SENSORS                        2
@@ -64,8 +60,10 @@ enum FlightMode {
     CIRCLE        = 1,
     STABILIZE     = 2,
     TRAINING      = 3,
+    ACRO          = 4,
     FLY_BY_WIRE_A = 5,
     FLY_BY_WIRE_B = 6,
+    CRUISE        = 7,
     AUTO          = 10,
     RTL           = 11,
     LOITER        = 12,
@@ -73,6 +71,20 @@ enum FlightMode {
     INITIALISING  = 16
 };
 
+// type of stick mixing enabled
+enum StickMixing {
+    STICK_MIXING_DISABLED = 0,
+    STICK_MIXING_FBW      = 1,
+    STICK_MIXING_DIRECT   = 2
+};
+
+enum ChannelMixing {
+    MIXING_DISABLED = 0,
+    MIXING_UPUP     = 1,
+    MIXING_UPDN     = 2,
+    MIXING_DNUP     = 3,
+    MIXING_DNDN     = 4
+};
 
 // Commands - Note that APM now uses a subset of the MAVLink protocol
 // commands.  See enum MAV_CMD in the GCS_Mavlink library
@@ -130,31 +142,25 @@ enum ap_message {
     MSG_RETRY_DEFERRED // this must be last
 };
 
-enum gcs_severity {
-    SEVERITY_LOW=1,
-    SEVERITY_MEDIUM,
-    SEVERITY_HIGH,
-    SEVERITY_CRITICAL
-};
-
 // Logging message types. NOTE: If you change the value of one
 // of these then existing logs will break! Only add at the end, and 
 // mark unused ones as 'deprecated', but leave them in
 enum log_messages {
     LOG_INDEX_MSG,
-    LOG_ATTITUDE_MSG,
-    LOG_GPS_MSG,
-    LOG_MODE_MSG,
-    LOG_CONTROL_TUNING_MSG,
-    LOG_NAV_TUNING_MSG,
+    LOG_CTUN_MSG,
+    LOG_NTUN_MSG,
     LOG_PERFORMANCE_MSG,
-    LOG_IMU_MSG,
     LOG_CMD_MSG,
     LOG_CURRENT_MSG,
     LOG_STARTUP_MSG,
     TYPE_AIRSTART_MSG,
     TYPE_GROUNDSTART_MSG,
-    MAX_NUM_LOGS
+    LOG_CAMERA_MSG,
+    LOG_ATTITUDE_MSG,
+    LOG_MODE_MSG,
+    LOG_COMPASS_MSG,
+    LOG_TECS_MSG,
+    MAX_NUM_LOGS // always at the end
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -167,6 +173,9 @@ enum log_messages {
 #define MASK_LOG_IMU                    (1<<7)
 #define MASK_LOG_CMD                    (1<<8)
 #define MASK_LOG_CURRENT                (1<<9)
+#define MASK_LOG_COMPASS                (1<<10)
+#define MASK_LOG_TECS                   (1<<11)
+#define MASK_LOG_CAMERA                 (1<<12)
 
 // Waypoint Modes
 // ----------------
@@ -190,10 +199,6 @@ enum log_messages {
 #define ALTITUDE_HISTORY_LENGTH 8       //Number of (time,altitude) points to
                                         // regress a climb rate from
 
-
-#define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1024.0))*g.volt_div_ratio
-#define CURRENT_AMPS(x) ((x*(g.input_voltage/1024.0))-g.curr_amp_offset)*g.curr_amp_per_volt
-
 #define AN4                     4
 #define AN5                     5
 
@@ -214,7 +219,12 @@ enum log_messages {
 #define FENCE_WP_SIZE sizeof(Vector2l)
 #define FENCE_START_BYTE (EEPROM_MAX_ADDR-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
 
-#define MAX_WAYPOINTS  ((FENCE_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
+// rally points shoehorned between fence points and waypoints
+#define MAX_RALLYPOINTS 10
+#define RALLY_WP_SIZE 15
+#define RALLY_START_BYTE (FENCE_START_BYTE-(MAX_RALLYPOINTS*RALLY_WP_SIZE))
+
+#define MAX_WAYPOINTS  ((RALLY_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // -
                                                                           // 1
                                                                           // to
                                                                           // be
@@ -230,8 +240,10 @@ enum log_messages {
 // InertialSensor driver types
 #define CONFIG_INS_OILPAN  1
 #define CONFIG_INS_MPU6000 2
-#define CONFIG_INS_STUB    3
+#define CONFIG_INS_HIL     3
 #define CONFIG_INS_PX4     4
+#define CONFIG_INS_FLYMAPLE 5
+#define CONFIG_INS_L3G4200D 6
 
 // barometer driver types
 #define AP_BARO_BMP085   1
@@ -246,9 +258,16 @@ enum log_messages {
 
 // altitude control algorithms
 enum {
-    ALT_CONTROL_DEFAULT=0,
-    ALT_CONTROL_NON_AIRSPEED=1
+    ALT_CONTROL_DEFAULT      = 0,
+    ALT_CONTROL_NON_AIRSPEED = 1,
+    ALT_CONTROL_TECS         = 2,
+    ALT_CONTROL_AIRSPEED     = 3
 };
 
+// attitude controller choice
+enum {
+    ATT_CONTROL_PID = 0,
+    ATT_CONTROL_APMCONTROL = 1
+};
 
 #endif // _DEFINES_H

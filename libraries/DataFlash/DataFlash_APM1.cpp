@@ -1,13 +1,23 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
  *       DataFlash_APM1.cpp - DataFlash log library for AT45DB161
  *       Code by Jordi Muñoz and Jose Julio. DIYDrones.com
  *       This code works only on ATMega2560. It uses Serial port 3 in SPI MSPI mdoe.
- *
- *       This library is free software; you can redistribute it and/or
- *   modify it under the terms of the GNU Lesser General Public
- *   License as published by the Free Software Foundation; either
- *   version 2.1 of the License, or (at your option) any later version.
  *
  *       Dataflash library for AT45DB161D flash memory
  *       Memory organization : 4096 pages of 512 bytes or 528 bytes
@@ -18,15 +28,9 @@
  *       Methods:
  *               Init() : Library initialization (SPI initialization)
  *               StartWrite(page) : Start a write session. page=start page.
- *               WriteByte(data) : Write a byte
- *               WriteInt(data) :  Write an integer (2 bytes)
- *               WriteLong(data) : Write a long (4 bytes)
  *               StartRead(page) : Start a read on (page)
  *               GetWritePage() : Returns the last page written to
  *               GetPage() : Returns the last page read
- *               ReadByte()
- *               ReadInt()
- *               ReadLong()
  *
  *       Properties:
  *
@@ -70,6 +74,16 @@ extern const AP_HAL::HAL& hal;
 #define DF_CHIP_ERASE_2   0x80
 #define DF_CHIP_ERASE_3   0x9A
 
+/*
+  try to take a semaphore safely from both in a timer and outside
+ */
+bool DataFlash_APM1::_sem_take(uint8_t timeout)
+{
+    if (hal.scheduler->in_timerprocess()) {
+        return _spi_sem->take_nonblocking();
+    }
+    return _spi_sem->take(timeout);
+}
 
 
 // Public Methods //////////////////////////////////////////////////////////////
@@ -108,7 +122,7 @@ void DataFlash_APM1::Init(void)
 // This function is mainly to test the device
 void DataFlash_APM1::ReadManufacturerID()
 {
-    if (!_spi_sem->take(5))
+    if (!_sem_take(5))
         return;
     // activate dataflash command decoder
     _spi->cs_assert();
@@ -163,7 +177,7 @@ uint8_t DataFlash_APM1::ReadStatus()
 inline
 uint16_t DataFlash_APM1::PageSize()
 {
-    if (!_spi_sem->take(5))
+    if (!_sem_take(5))
         return 0;
     
     uint16_t ret = 528-((ReadStatusReg()&0x01) << 4); // if first bit 1 trhen 512 else 528 bytes
@@ -181,7 +195,7 @@ void DataFlash_APM1::WaitReady()
 
 void DataFlash_APM1::PageToBuffer(uint8_t BufferNum, uint16_t PageAdr)
 {
-    if (!_spi_sem->take(1))
+    if (!_sem_take(1))
         return;
 
     // activate dataflash command decoder
@@ -208,7 +222,7 @@ void DataFlash_APM1::PageToBuffer(uint8_t BufferNum, uint16_t PageAdr)
 
 void DataFlash_APM1::BufferToPage (uint8_t BufferNum, uint16_t PageAdr, uint8_t wait)
 {
-    if (!_spi_sem->take(1))
+    if (!_sem_take(1))
         return;
 
     // activate dataflash command decoder
@@ -240,7 +254,7 @@ void DataFlash_APM1::BlockWrite (uint8_t BufferNum, uint16_t IntPageAdr,
                                  const void *pHeader, uint8_t hdr_size,
                                  const void *pBuffer, uint16_t size)
 {
-    if (!_spi_sem->take(1))
+    if (!_sem_take(1))
         return;
     
     // activate dataflash command decoder
@@ -268,7 +282,7 @@ void DataFlash_APM1::BlockWrite (uint8_t BufferNum, uint16_t IntPageAdr,
 
 bool DataFlash_APM1::BlockRead(uint8_t BufferNum, uint16_t IntPageAdr, void *pBuffer, uint16_t size)
 {
-    if (!_spi_sem->take(1))
+    if (!_sem_take(1))
         return false;
 
     // activate dataflash command decoder
@@ -298,7 +312,7 @@ bool DataFlash_APM1::BlockRead(uint8_t BufferNum, uint16_t IntPageAdr, void *pBu
 
 void DataFlash_APM1::PageErase (uint16_t PageAdr)
 {
-    if (!_spi_sem->take(1))
+    if (!_sem_take(1))
         return;
 
     // activate dataflash command decoder
@@ -326,7 +340,7 @@ void DataFlash_APM1::PageErase (uint16_t PageAdr)
 
 void DataFlash_APM1::BlockErase (uint16_t BlockAdr)
 {
-    if (!_spi_sem->take(1))
+    if (!_sem_take(1))
         return;
 
     // activate dataflash command decoder
@@ -364,7 +378,7 @@ void DataFlash_APM1::BlockErase (uint16_t BlockAdr)
 
 void DataFlash_APM1::ChipErase()
 {
-    if (!_spi_sem->take(5))
+    if (!_sem_take(5))
         return;
 
     // activate dataflash command decoder

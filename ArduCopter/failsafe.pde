@@ -31,8 +31,10 @@ void failsafe_disable()
 //
 //  failsafe_check - this function is called from the core timer interrupt at 1kHz.
 //
-void failsafe_check(uint32_t tnow)
+void failsafe_check()
 {
+    uint32_t tnow = hal.scheduler->micros();
+
     if (mainLoop_count != failsafe_last_mainLoop_count) {
         // the main loop is running, all is OK
         failsafe_last_mainLoop_count = mainLoop_count;
@@ -53,9 +55,7 @@ void failsafe_check(uint32_t tnow)
         failsafe_last_timestamp = tnow;
         if(motors.armed()) {
             motors.armed(false);
-        	set_armed(true);
             motors.output();
-            Log_Write_Error(ERROR_SUBSYSTEM_FAILSAFE, ERROR_CODE_FAILSAFE_WATCHDOG);
         }
     }
 }

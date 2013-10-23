@@ -1,14 +1,24 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: t -*-
+// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 /// @file	GCS_MAVLink.cpp
 
 /*
 This provides some support code and variables for MAVLink enabled sketches
 
-This firmware is free software; you can redistribute it and/or
-modify it under the terms of the GNU Lesser General Public
-License as published by the Free Software Foundation; either
-version 2.1 of the License, or (at your option) any later version.
 */
 
 #include <AP_HAL.h>
@@ -74,4 +84,16 @@ static const uint8_t mavlink_message_crc_progmem[256] PROGMEM = MAVLINK_MESSAGE_
 uint8_t mavlink_get_message_crc(uint8_t msgid)
 {
 	return pgm_read_byte(&mavlink_message_crc_progmem[msgid]);
+}
+
+extern const AP_HAL::HAL& hal;
+
+/*
+  return true if the MAVLink parser is idle, so there is no partly parsed
+  MAVLink message being processed
+ */
+bool comm_is_idle(mavlink_channel_t chan)
+{
+	mavlink_status_t *status = mavlink_get_channel_status(chan);
+	return status == NULL || status->parse_state <= MAVLINK_PARSE_STATE_IDLE;
 }

@@ -1,69 +1,52 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduRover v2.30"
-
-// This is the APMrover firmware derived from the Arduplane v2.32 by Jean-Louis Naudin (JLN) 
+#define THISFIRMWARE "ArduRover v2.43"
 /*
-Authors:    Doug Weibel, Jose Julio, Jordi Munoz, Jason Short, Andrew Tridgell, Randy Mackay, Pat Hickey, John Arne Birkeland, Olivier Adler, Jean-Louis Naudin
-Thanks to:  Chris Anderson, Michael Oborne, Paul Mather, Bill Premerlani, James Cohen, JB from rotorFX, Automatik, Fefenin, Peter Meister, Remzibi, Yury Smirnov, Sandro Benigno, Max Levine, Roberto Navoni, Lorenz Meier 
-Please contribute your ideas!
-APMrover alpha version tester: Franco Borasio, Daniel Chapelat... 
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
 
-This firmware is free software; you can redistribute it and/or
-modify it under the terms of the GNU Lesser General Public
-License as published by the Free Software Foundation; either
-version 2.1 of the License, or (at your option) any later version.
-//
-// JLN updates: last update 2012-06-21
-// DOLIST:
-//-------------------------------------------------------------------------------------------------------------------------
-// Dev Startup : 2012-04-21
-//
-//  2012-06-21: Update for HIL mode with mavlink 1.0 (new lib)
-//  2012-06-13: use RangeFinder optical SharpGP2Y instead of ultrasonic sonar
-//  2012-06-13: added Test sonar
-//  2012-05-17: added speed_boost during straight line
-//  2012-05-17: New update about the throttle rate control based on the field test done by Franco Borasio (Thanks Franco..)
-//  2012-05-15: The Throttle rate can be controlled by the THROTTLE_SLEW_LIMIT (the value give the step increase, 1 = 0.1)
-//  2012-05-14: Update about mavlink library (now compatible with the latest version of mavlink)
-//  2012-05-14: Added option (hold roll to full right + SW7 ON/OFF) to init_home during the wp_list reset
-//  2012-05-13: Add ROV_SONAR_TRIG (default = 200 cm)
-//  2012-05-13: Restart_nav() added and heading bug correction, tested OK in the field
-//  2012-05-12: RTL then stop update - Tested in the field
-//  2012-05-11: The rover now STOP after the RTL... (special update for Franco...)
-//  2012-05-11: Added SONAR detection for obstacle avoidance (alpha version for SONAR testing)
-//  2012-05-04: Added #define LITE ENABLED  for the APM1280 or APM2560 CPU IMUless version
-//  2012-05-03: Successful missions tests with a full APM2560 kit (GPS MT3329 + magnetometer HMC5883L)
-//  2012-05-03: removing stick mixing in auto mode
-//  2012-05-01: special update for rover about ground_course if compass is enabled
-//  2012-04-30: Successfully tested in autonomous nav with a waypoints list recorded in live mode
-//  2012-04-30: Now a full version for APM v1 or APM v2 with magnetometer
-//  2012-04-27: Cosmetic changes
-//  2012-04-26: Only one PID (pidNavRoll) for steering the wheel with nav_steer
-//  2012-04-26: Added ground_speed and ground_course variables in Update_GPS
-//  2012-04-26: Set GPS to 10 Hz (updated in the AP_GPS lib)
-//  2012-04-22: Tested on Traxxas Monster Jam Grinder XL-5 3602
-//  2012-04-21: Roll set to wheels control and Throttle neutral to 50% (0 -100)  - Forward>50, Backward<50
-//
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+/* 
+   This is the APMrover2 firmware. It was originally derived from
+   ArduPlane by Jean-Louis Naudin (JLN), and then rewritten after the
+   AP_HAL merge by Andrew Tridgell
+
+   Maintainer: Andrew Tridgell
+
+   Authors:    Doug Weibel, Jose Julio, Jordi Munoz, Jason Short, Andrew Tridgell, Randy Mackay, Pat Hickey, John Arne Birkeland, Olivier Adler, Jean-Louis Naudin
+
+   Thanks to:  Chris Anderson, Michael Oborne, Paul Mather, Bill Premerlani, James Cohen, JB from rotorFX, Automatik, Fefenin, Peter Meister, Remzibi, Yury Smirnov, Sandro Benigno, Max Levine, Roberto Navoni, Lorenz Meier 
+
+   APMrover alpha version tester: Franco Borasio, Daniel Chapelat... 
+
+   Please contribute your ideas! See http://dev.ardupilot.com for details
+*/
+
 // Radio setup:
 // APM INPUT (Rec = receiver)
-// Rec ch1: Roll 
-// Rec ch2: Throttle
-// Rec ch3: Pitch
-// Rec ch4: Yaw
+// Rec ch1: Steering
+// Rec ch2: not used
+// Rec ch3: Throttle
+// Rec ch4: not used
 // Rec ch5: not used
 // Rec ch6: not used
-// Rec ch7: Option channel to 2 positions switch
-// Rec ch8: Mode channel to 3 positions switch
+// Rec ch7: Option channel to 2 position switch
+// Rec ch8: Mode channel to 6 position switch
 // APM OUTPUT
 // Ch1: Wheel servo (direction)
 // Ch2: not used
 // Ch3: to the motor ESC
 // Ch4: not used
-//
-// more infos about this experimental version: http://diydrones.com/profile/JeanLouisNaudin
-// =======================================================================================================
-*/
 
 ////////////////////////////////////////////////////////////////////////////////
 // Header includes
@@ -97,18 +80,30 @@ version 2.1 of the License, or (at your option) any later version.
 #include <AverageFilter.h>	// Mode Filter from Filter library
 #include <AP_Relay.h>       // APM relay
 #include <AP_Mount.h>		// Camera/Antenna mount
+#include <AP_Camera.h>		// Camera triggering
 #include <GCS_MAVLink.h>    // MAVLink GCS definitions
 #include <AP_Airspeed.h>    // needed for AHRS build
+#include <AP_Vehicle.h>     // needed for AHRS build
 #include <memcheck.h>
 #include <DataFlash.h>
+#include <AP_RCMapper.h>        // RC input mapping library
 #include <SITL.h>
+#include <AP_Scheduler.h>       // main loop scheduler
 #include <stdarg.h>
+#include <AP_Navigation.h>
+#include <APM_Control.h>
+#include <AP_L1_Control.h>
 
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
 #include <AP_HAL_PX4.h>
+#include <AP_HAL_FLYMAPLE.h>
+#include <AP_HAL_Linux.h>
 #include <AP_HAL_Empty.h>
 #include "compat.h"
+
+#include <AP_Notify.h>      // Notify library
+#include <AP_BattMonitor.h> // Battery monitor library
 
 // Configuration
 #include "config.h"
@@ -143,21 +138,38 @@ static const AP_InertialSensor::Sample_rate ins_sample_rate = AP_InertialSensor:
 //
 static Parameters      g;
 
+// main loop scheduler
+static AP_Scheduler scheduler;
+
+// mapping between input channels
+static RCMapper rcmap;
+
+// primary control channels
+static RC_Channel *channel_steer;
+static RC_Channel *channel_throttle;
+static RC_Channel *channel_learn;
 
 ////////////////////////////////////////////////////////////////////////////////
 // prototypes
 static void update_events(void);
+void gcs_send_text_fmt(const prog_char_t *fmt, ...);
+static void print_mode(AP_HAL::BetterStream *port, uint8_t mode);
 
 ////////////////////////////////////////////////////////////////////////////////
 // DataFlash
 ////////////////////////////////////////////////////////////////////////////////
 #if CONFIG_HAL_BOARD == HAL_BOARD_APM1
-DataFlash_APM1 DataFlash;
+static DataFlash_APM1 DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
-DataFlash_APM2 DataFlash;
+static DataFlash_APM2 DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
-DataFlash_SITL DataFlash;
+//static DataFlash_File DataFlash("/tmp/APMlogs");
+static DataFlash_SITL DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
+static DataFlash_File DataFlash("/fs/microsd/APM/logs");
+#elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
+static DataFlash_File DataFlash("logs");
+#else
 DataFlash_Empty DataFlash;
 #endif
 
@@ -181,72 +193,78 @@ static GPS         *g_gps;
 // flight modes convenience array
 static AP_Int8		*modes = &g.mode1;
 
-#if HIL_MODE == HIL_MODE_DISABLED
-
-// real sensors
-#if CONFIG_ADC == ENABLED
-static AP_ADC_ADS7844          adc;
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM1
+static AP_ADC_ADS7844 adc;
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
+#if CONFIG_COMPASS == AP_COMPASS_PX4
+static AP_Compass_PX4 compass;
+#elif CONFIG_COMPASS == AP_COMPASS_HMC5843
+static AP_Compass_HMC5843 compass;
+#elif CONFIG_COMPASS == AP_COMPASS_HIL
 static AP_Compass_HIL compass;
-static SITL sitl;
 #else
-static AP_Compass_HMC5843      compass;
+ #error Unrecognized CONFIG_COMPASS setting
 #endif
 
-// real GPS selection
+// GPS selection
 #if   GPS_PROTOCOL == GPS_PROTOCOL_AUTO
 AP_GPS_Auto     g_gps_driver(&g_gps);
 
 #elif GPS_PROTOCOL == GPS_PROTOCOL_NMEA
-AP_GPS_NMEA     g_gps_driver();
+AP_GPS_NMEA     g_gps_driver;
 
 #elif GPS_PROTOCOL == GPS_PROTOCOL_SIRF
-AP_GPS_SIRF     g_gps_driver();
+AP_GPS_SIRF     g_gps_driver;
 
 #elif GPS_PROTOCOL == GPS_PROTOCOL_UBLOX
-AP_GPS_UBLOX    g_gps_driver();
+AP_GPS_UBLOX    g_gps_driver;
 
 #elif GPS_PROTOCOL == GPS_PROTOCOL_MTK
-AP_GPS_MTK      g_gps_driver();
+AP_GPS_MTK      g_gps_driver;
 
 #elif GPS_PROTOCOL == GPS_PROTOCOL_MTK19
-AP_GPS_MTK19    g_gps_driver();
+AP_GPS_MTK19    g_gps_driver;
 
 #elif GPS_PROTOCOL == GPS_PROTOCOL_NONE
-AP_GPS_None     g_gps_driver();
+AP_GPS_None     g_gps_driver;
+
+#elif GPS_PROTOCOL == GPS_PROTOCOL_HIL
+AP_GPS_HIL      g_gps_driver;
 
 #else
- #error Unrecognised GPS_PROTOCOL setting.
+  #error Unrecognised GPS_PROTOCOL setting.
 #endif // GPS PROTOCOL
 
-# if CONFIG_INS_TYPE == CONFIG_INS_MPU6000
-  AP_InertialSensor_MPU6000 ins;
-# elif CONFIG_INS_TYPE == CONFIG_INS_SITL
-  AP_InertialSensor_Stub ins;
+#if CONFIG_INS_TYPE == CONFIG_INS_MPU6000
+AP_InertialSensor_MPU6000 ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_PX4
+AP_InertialSensor_PX4 ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_HIL
+AP_InertialSensor_HIL ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_FLYMAPLE
+AP_InertialSensor_Flymaple ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_L3G4200D
+AP_InertialSensor_L3G4200D ins;
+#elif CONFIG_INS_TYPE == CONFIG_INS_OILPAN
+AP_InertialSensor_Oilpan ins( &adc );
 #else
-  AP_InertialSensor_Oilpan ins( &adc );
+  #error Unrecognised CONFIG_INS_TYPE setting.
 #endif // CONFIG_INS_TYPE
 
-AP_AHRS_DCM  ahrs(&ins, g_gps);
+AP_AHRS_DCM ahrs(&ins, g_gps);
 
-#elif HIL_MODE == HIL_MODE_SENSORS
-// sensor emulators
-AP_ADC_HIL              adc;
-AP_Compass_HIL          compass;
-AP_GPS_HIL              g_gps_driver(NULL);
-AP_InertialSensor_Oilpan ins( &adc );
-AP_AHRS_DCM  ahrs(&ins, g_gps);
+static AP_L1_Control L1_controller(ahrs);
 
-#elif HIL_MODE == HIL_MODE_ATTITUDE
-AP_ADC_HIL              adc;
-AP_AHRS_HIL             ahrs(&ins, g_gps);
-AP_GPS_HIL              g_gps_driver(NULL);
-AP_Compass_HIL          compass; // never used
-#else
- #error Unrecognised HIL_MODE setting.
-#endif // HIL MODE
+// selected navigation controller
+static AP_Navigation *nav_controller = &L1_controller;
+
+// steering controller
+static AP_SteerController steerController(ahrs);
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
+SITL sitl;
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // GCS selection
@@ -261,36 +279,40 @@ AP_HAL::AnalogSource *rssi_analog_source;
 
 AP_HAL::AnalogSource *vcc_pin;
 
-AP_HAL::AnalogSource * batt_volt_pin;
-AP_HAL::AnalogSource * batt_curr_pin;
-
 ////////////////////////////////////////////////////////////////////////////////
 // SONAR selection
 ////////////////////////////////////////////////////////////////////////////////
 //
-ModeFilterInt16_Size5 sonar_mode_filter(2);
-#if CONFIG_SONAR == ENABLED
-    AP_HAL::AnalogSource *sonar_analog_source;
-    AP_RangeFinder_MaxsonarXL *sonar;
-#endif
+static AP_RangeFinder_analog sonar;
+static AP_RangeFinder_analog sonar2;
 
 // relay support
 AP_Relay relay;
 
+// Camera
+#if CAMERA == ENABLED
+static AP_Camera camera(&relay);
+#endif
+
+// The rover's current location
+static struct 	Location current_loc;
+
+
 // Camera/Antenna mount tracking and stabilisation stuff
 // --------------------------------------
 #if MOUNT == ENABLED
-AP_Mount camera_mount(g_gps, &dcm);
+// current_loc uses the baro/gps soloution for altitude rather than gps only.
+// mabe one could use current_loc for lat/lon too and eliminate g_gps alltogether?
+AP_Mount camera_mount(&current_loc, g_gps, ahrs, 0);
 #endif
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Global variables
 ////////////////////////////////////////////////////////////////////////////////
 
-// APM2 only
-#if USB_MUX_PIN > 0
+// if USB is connected
 static bool usb_connected;
-#endif
 
 /* Radio values
 		Channel assignments
@@ -300,7 +322,7 @@ static bool usb_connected;
 			4   ---
 			5   Aux5
 			6   Aux6
-			7   Aux7
+			7   Aux7/learn
 			8   Aux8/Mode
 		Each Aux channel can be configured to have any of the available auxiliary functions assigned to it.
 		See libraries/RC_Channel/RC_Channel_aux.h for more information
@@ -325,22 +347,17 @@ static bool rc_override_active = false;
 // Failsafe
 ////////////////////////////////////////////////////////////////////////////////
 // A tracking variable for type of failsafe active
-// Used for failsafe based on loss of RC signal or GCS signal
-static int16_t 	failsafe;					
-// Used to track if the value on channel 3 (throtttle) has fallen below the failsafe threshold
-// RC receiver should be set up to output a low throttle value when signal is lost
-static bool 	ch3_failsafe;
+// Used for failsafe based on loss of RC signal or GCS signal. See 
+// FAILSAFE_EVENT_*
+static struct {
+    uint8_t bits;
+    uint32_t rc_override_timer;
+    uint32_t start_time;
+    uint8_t triggered;
+} failsafe;
 
-// A timer used to track how long since we have received the last GCS heartbeat or rc override message
-static uint32_t rc_override_fs_timer = 0;
-// A timer used to track how long we have been in a "short failsafe" condition due to loss of RC signal
-static uint32_t ch3_failsafe_timer = 0;
-
-////////////////////////////////////////////////////////////////////////////////
-// LED output
-////////////////////////////////////////////////////////////////////////////////
-// state of the GPS light (on/off)
-static bool GPS_light;							
+// notify object
+static AP_Notify notify;
 
 ////////////////////////////////////////////////////////////////////////////////
 // GPS variables
@@ -370,17 +387,6 @@ const	float radius_of_earth 	= 6378100;	// meters
 // true if we have a position estimate from AHRS
 static bool have_position;
 
-// This is the currently calculated direction to fly.  
-// deg * 100 : 0 to 360
-static int32_t nav_bearing;
-// This is the direction to the next waypoint
-// deg * 100 : 0 to 360
-static int32_t target_bearing;	
-//This is the direction from the last waypoint to the next waypoint 
-// deg * 100 : 0 to 360
-static int32_t crosstrack_bearing;
-// A gain scaler to account for ground speed/headwind/tailwind
-static float	nav_gain_scaler 		= 1;		
 static bool rtl_complete = false;
 
 // There may be two active commands in Auto mode.  
@@ -403,9 +409,20 @@ static uint8_t receiver_rssi;
 // the time when the last HEARTBEAT message arrived from a GCS
 static uint32_t last_heartbeat_ms;
 
-// The distance as reported by Sonar in cm – Values are 20 to 700 generally.
-static int16_t		sonar_dist;
-static bool obstacle = false;
+// obstacle detection information
+static struct {
+    // have we detected an obstacle?
+    uint8_t detected_count;
+    float turn_angle;
+    uint16_t sonar1_distance_cm;
+    uint16_t sonar2_distance_cm;
+
+    // time when we last detected an obstacle, in milliseconds
+    uint32_t detected_time_ms;
+} obstacle;
+
+// this is set to true when auto has been triggered to start
+static bool auto_triggered;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Ground speed
@@ -413,16 +430,6 @@ static bool obstacle = false;
 // The amount current ground speed is below min ground speed.  meters per second
 static float 	ground_speed = 0;
 static int16_t throttle_last = 0, throttle = 500;
-
-////////////////////////////////////////////////////////////////////////////////
-// Location Errors
-////////////////////////////////////////////////////////////////////////////////
-// Difference between current bearing and desired bearing.  in centi-degrees
-static int32_t bearing_error_cd;
-// Difference between current altitude and desired altitude.  Centimeters
-static int32_t altitude_error;
-// Distance perpandicular to the course line that we are off trackline.  Meters 
-static float	crosstrack_error;
 
 ////////////////////////////////////////////////////////////////////////////////
 // CH7 control
@@ -435,33 +442,22 @@ static bool ch7_flag;
 // This register tracks the current Mission Command index when writing
 // a mission using CH7 in flight
 static int8_t CH7_wp_index;
-float tuning_value;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Battery Sensors
 ////////////////////////////////////////////////////////////////////////////////
-// Battery pack 1 voltage.  Initialized above the low voltage threshold to pre-load the filter and prevent low voltage events at startup.
-static float 	battery_voltage1 	= LOW_VOLTAGE * 1.05;
-// Battery pack 1 instantaneous currrent draw.  Amperes
-static float	current_amps1;
-// Totalized current (Amp-hours) from battery 1
-static float	current_total1;									
-
-// To Do - Add support for second battery pack
-//static float 	battery_voltage2 	= LOW_VOLTAGE * 1.05;		// Battery 2 Voltage, initialized above threshold for filter
-//static float	current_amps2;									// Current (Amperes) draw from battery 2
-//static float	current_total2;									// Totalized current (Amp-hours) from battery 2
+static AP_BattMonitor battery;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Navigation control variables
 ////////////////////////////////////////////////////////////////////////////////
-// The instantaneous desired bank angle.  Hundredths of a degree
-static int32_t nav_steer;
+// The instantaneous desired lateral acceleration in m/s/s
+static float lateral_acceleration;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Waypoint distances
 ////////////////////////////////////////////////////////////////////////////////
-// Distance between plane and next waypoint.  Meters
+// Distance between rover and next waypoint.  Meters
 static float wp_distance;
 // Distance between previous and next waypoint.  Meters
 static int32_t wp_totalDistance;
@@ -504,8 +500,6 @@ static struct 	Location home;
 static bool	home_is_set;
 // The location of the previous waypoint.  Used for track following and altitude ramp calculations
 static struct 	Location prev_WP;
-// The plane's current location
-static struct 	Location current_loc;
 // The location of the current/active waypoint.  Used for track following
 static struct 	Location next_WP;
 // The location of the active waypoint in Guided mode.
@@ -549,27 +543,39 @@ static uint8_t 		delta_ms_fast_loop;
 // Counter of main loop executions.  Used for performance monitoring and failsafe processing
 static uint16_t			mainLoop_count;
 
-// Time in miliseconds of start of medium control loop.  Milliseconds
-static uint32_t 	medium_loopTimer;
-// Counters for branching from main control loop to slower loops
-static uint8_t 			medium_loopCounter;	
-// Number of milliseconds used in last medium loop cycle
-static uint8_t			delta_ms_medium_loop;
-
-// Counters for branching from medium control loop to slower loops
-static uint8_t 			slow_loopCounter;
-// Counter to trigger execution of very low rate processes
-static uint8_t 			superslow_loopCounter;
-// Counter to trigger execution of 1 Hz processes
-static uint8_t				counter_one_herz;
-
-// % MCU cycles used
-static float 			load;
-
 ////////////////////////////////////////////////////////////////////////////////
 // Top-level logic
 ////////////////////////////////////////////////////////////////////////////////
 
+/*
+  scheduler table - all regular tasks apart from the fast_loop()
+  should be listed here, along with how often they should be called
+  (in 20ms units) and the maximum time they are expected to take (in
+  microseconds)
+ */
+static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
+    { update_GPS,             5,   2500 },
+    { navigate,               5,   1600 },
+    { update_compass,         5,   2000 },
+    { update_commands,        5,   1000 },
+    { update_logging,         5,   1000 },
+    { read_battery,           5,   1000 },
+    { read_receiver_rssi,     5,   1000 },
+    { read_trim_switch,       5,   1000 },
+    { read_control_switch,   15,   1000 },
+    { update_events,         15,   1000 },
+    { check_usb_mux,         15,   1000 },
+    { mount_update,           1,    500 },
+    { gcs_failsafe_check,     5,    500 },
+    { compass_accumulate,     1,    900 },
+    { update_notify,          1,    100 },
+    { one_second_loop,       50,   3000 }
+};
+
+
+/*
+  setup is called when the sketch starts
+ */
 void setup() {
 	memcheck_init();
     cliSerial = hal.console;
@@ -577,77 +583,50 @@ void setup() {
     // load the default values of variables listed in var_info[]
     AP_Param::setup_sketch_defaults();
 
-    rssi_analog_source = hal.analogin->channel(ANALOG_INPUT_NONE, 0.25);
-    vcc_pin = hal.analogin->channel(ANALOG_INPUT_BOARD_VCC);
-    batt_volt_pin = hal.analogin->channel(g.battery_volt_pin);
-    batt_curr_pin = hal.analogin->channel(g.battery_curr_pin);
+    // rover does not use arming nor pre-arm checks
+    AP_Notify::flags.armed = true;
+    AP_Notify::flags.pre_arm_check = true;
+    AP_Notify::flags.failsafe_battery = false;
 
-#if CONFIG_SONAR == ENABLED
- #if CONFIG_SONAR_SOURCE == SONAR_SOURCE_ADC
-    sonar_analog_source = new AP_ADC_AnalogSource(
-        &adc, CONFIG_SONAR_SOURCE_ADC_CHANNEL, 0.25);
- #elif CONFIG_SONAR_SOURCE == SONAR_SOURCE_ANALOG_PIN
-    sonar_analog_source = hal.analogin->channel(
-        CONFIG_SONAR_SOURCE_ANALOG_PIN);
- #else
-  #warning "Invalid CONFIG_SONAR_SOURCE"
- #endif
-    sonar = new AP_RangeFinder_MaxsonarXL(sonar_analog_source,
-                                          &sonar_mode_filter);
-#endif
+    notify.init();
+
+    battery.init();
+
+    rssi_analog_source = hal.analogin->channel(ANALOG_INPUT_NONE);
+    vcc_pin = hal.analogin->channel(ANALOG_INPUT_BOARD_VCC);
 
 	init_ardupilot();
+
+    // initialise the main loop scheduler
+    scheduler.init(&scheduler_tasks[0], sizeof(scheduler_tasks)/sizeof(scheduler_tasks[0]));
 }
 
+/*
+  loop() is called rapidly while the sketch is running
+ */
 void loop()
 {
-    // We want this to execute at 50Hz, but synchronised with the gyro/accel
-    uint16_t num_samples = ins.num_samples_available();
-    if (num_samples >= 1) {
-		delta_ms_fast_loop	= millis() - fast_loopTimer;
-		load                = (float)(fast_loopTimeStamp - fast_loopTimer)/delta_ms_fast_loop;
-		G_Dt                = (float)delta_ms_fast_loop / 1000.f;
-		fast_loopTimer      = millis();
-
-		mainLoop_count++;
-
-		// Execute the fast loop
-		// ---------------------
-		fast_loop();
-
-		// Execute the medium loop
-		// -----------------------
-		medium_loop();
-
-		counter_one_herz++;
-		if(counter_one_herz == 50){
-			one_second_loop();
-			counter_one_herz = 0;
-		}
-
-		if (millis() - perf_mon_timer > 20000) {
-			if (mainLoop_count != 0) {
-  #if LITE == DISABLED
-				if (g.log_bitmask & MASK_LOG_PM)
-					#if HIL_MODE != HIL_MODE_ATTITUDE
-					Log_Write_Performance();
-					#endif
- #endif
-				resetPerfData();
-			}
-		}
-
-		fast_loopTimeStamp = millis();
-    } else if (millis() - fast_loopTimeStamp < 19) {
-        // less than 19ms has passed. We have at least one millisecond
-        // of free time. The most useful thing to do with that time is
-        // to accumulate some sensor readings, specifically the
-        // compass, which is often very noisy but is not interrupt
-        // driven, so it can't accumulate readings by itself
-        if (g.compass_enabled) {
-            compass.accumulate();
-        }
+    // wait for an INS sample
+    if (!ins.wait_for_sample(1000)) {
+        return;
     }
+    uint32_t timer = millis();
+
+    delta_ms_fast_loop	= timer - fast_loopTimer;
+    G_Dt                = (float)delta_ms_fast_loop / 1000.f;
+    fast_loopTimer      = timer;
+
+    mainLoop_count++;
+
+    // Execute the fast loop
+    // ---------------------
+    fast_loop();
+
+    // tell the scheduler one tick has passed
+    scheduler.tick();
+    fast_loopTimeStamp = millis();
+
+    scheduler.run(19000U);
 }
 
 // Main loop 50Hz
@@ -666,235 +645,183 @@ static void fast_loop()
     // some space available
     gcs_send_message(MSG_RETRY_DEFERRED);
 
-	#if HIL_MODE == HIL_MODE_SENSORS
+	#if HIL_MODE != HIL_MODE_DISABLED
 		// update hil before dcm update
 		gcs_update();
 	#endif
 
-#if LITE == DISABLED
 	ahrs.update();
-#endif 
-	// Read Sonar
-	// ----------
-#if CONFIG_SONAR == ENABLED
-	if(g.sonar_enabled){
-		sonar_dist = sonar->read();
 
-	if(sonar_dist <= g.sonar_trigger)  {  // obstacle detected in front 
-            obstacle = true;
-      } else  { 
-            obstacle = false;
-            }
-	}
-#endif
+    read_sonars();
 
-	// uses the yaw from the DCM to give more accurate turns
-	calc_bearing_error();
+    if (g.log_bitmask & MASK_LOG_ATTITUDE_FAST)
+        Log_Write_Attitude();
 
-#if LITE == DISABLED
-	# if HIL_MODE == HIL_MODE_DISABLED
-		if (g.log_bitmask & MASK_LOG_ATTITUDE_FAST)
-			Log_Write_Attitude((int)ahrs.roll_sensor, (int)ahrs.pitch_sensor, (uint16_t)ahrs.yaw_sensor);
-
-		if (g.log_bitmask & MASK_LOG_IMU)
-			Log_Write_IMU();
-	#endif
-#endif
-	// inertial navigation
-	// ------------------
-	#if INERTIAL_NAVIGATION == ENABLED
-		// TODO: implement inertial nav function
-		inertialNavigation();
-	#endif
+    if (g.log_bitmask & MASK_LOG_IMU)
+        DataFlash.Log_Write_IMU(&ins);
 
 	// custom code/exceptions for flight modes
 	// ---------------------------------------
 	update_current_mode();
 
-	// apply desired steering if in an auto mode
-	if (control_mode >= AUTO) {
-        g.channel_steer.servo_out = nav_steer;
-    }
-
 	// write out the servo PWM values
 	// ------------------------------
 	set_servos();
-
-
-	// XXX is it appropriate to be doing the comms below on the fast loop?
 
     gcs_update();
     gcs_data_stream_send();
 }
 
-static void medium_loop()
+/*
+  update camera mount - 50Hz
+ */
+static void mount_update(void)
 {
 #if MOUNT == ENABLED
 	camera_mount.update_mount_position();
 #endif
-
-	// This is the start of the medium (10 Hz) loop pieces
-	// -----------------------------------------
-	switch(medium_loopCounter) {
-
-		// This case deals with the GPS
-		//-------------------------------
-		case 0:
-			medium_loopCounter++;
-            update_GPS();
-            
-//#if LITE == DISABLED
-			#if HIL_MODE != HIL_MODE_ATTITUDE
-            if (g.compass_enabled && compass.read()) {
-                ahrs.set_compass(&compass);
-                // Calculate heading
-                compass.null_offsets();
-            } else {
-                ahrs.set_compass(NULL);
-            }
-			#endif
-//#endif
-/*{
-cliSerial->print(ahrs.roll_sensor, DEC);	cliSerial->printf_P(PSTR("\t"));
-cliSerial->print(ahrs.pitch_sensor, DEC);	cliSerial->printf_P(PSTR("\t"));
-cliSerial->print(ahrs.yaw_sensor, DEC);	cliSerial->printf_P(PSTR("\t"));
-Vector3f tempaccel = ins.get_accel();
-cliSerial->print(tempaccel.x, DEC);	cliSerial->printf_P(PSTR("\t"));
-cliSerial->print(tempaccel.y, DEC);	cliSerial->printf_P(PSTR("\t"));
-cliSerial->println(tempaccel.z, DEC);
-}*/
-
-			break;
-
-		// This case performs some navigation computations
-		//------------------------------------------------
-		case 1:
-			medium_loopCounter++;
-            navigate();
-			break;
-
-		// command processing
-		//------------------------------
-		case 2:
-			medium_loopCounter++;
-
-			// perform next command
-			// --------------------
-			update_commands();
-			break;
-
-		// This case deals with sending high rate telemetry
-		//-------------------------------------------------
-		case 3:
-			medium_loopCounter++;
-#if LITE == DISABLED
-			#if HIL_MODE != HIL_MODE_ATTITUDE
-				if ((g.log_bitmask & MASK_LOG_ATTITUDE_MED) && !(g.log_bitmask & MASK_LOG_ATTITUDE_FAST))
-					Log_Write_Attitude((int)ahrs.roll_sensor, (int)ahrs.pitch_sensor, (uint16_t)ahrs.yaw_sensor);
-
-				if (g.log_bitmask & MASK_LOG_CTUN)
-					Log_Write_Control_Tuning();
-			#endif
-
-			if (g.log_bitmask & MASK_LOG_NTUN)
-				Log_Write_Nav_Tuning();
-
-			if (g.log_bitmask & MASK_LOG_GPS)
-				Log_Write_GPS(g_gps->time, current_loc.lat, current_loc.lng, g_gps->altitude, current_loc.alt, g_gps->ground_speed, g_gps->ground_course, g_gps->fix, g_gps->num_sats);
+#if CAMERA == ENABLED
+    camera.trigger_pic_cleanup();
 #endif
-			break;
-
-		// This case controls the slow loop
-		//---------------------------------
-		case 4:
-			medium_loopCounter = 0;
-			delta_ms_medium_loop	= millis() - medium_loopTimer;
-			medium_loopTimer      	= millis();
-
-			if (g.battery_monitoring != 0){
-				read_battery();
-			}
-
-			read_trim_switch();
-
-			slow_loop();
-			break;
-	}
 }
 
-static void slow_loop()
+/*
+  check for GCS failsafe - 10Hz
+ */
+static void gcs_failsafe_check(void)
 {
-	// This is the slow (3 1/3 Hz) loop pieces
-	//----------------------------------------
-	switch (slow_loopCounter){
-		case 0:
-			slow_loopCounter++;
-			check_long_failsafe();
-			superslow_loopCounter++;
-			if(superslow_loopCounter >=200) {				//	200 = Execute every minute
-#if LITE == DISABLED
-				#if HIL_MODE != HIL_MODE_ATTITUDE
-					if(g.compass_enabled) {
-						compass.save_offsets();
-					}
-				#endif
+	if (g.fs_gcs_enabled) {
+        failsafe_trigger(FAILSAFE_EVENT_GCS, last_heartbeat_ms != 0 && (millis() - last_heartbeat_ms) > 2000);
+    }
+}
+
+/*
+  if the compass is enabled then try to accumulate a reading
+ */
+static void compass_accumulate(void)
+{
+    if (g.compass_enabled) {
+        compass.accumulate();
+    }    
+}
+
+/*
+  check for new compass data - 10Hz
+ */
+static void update_compass(void)
+{
+    if (g.compass_enabled && compass.read()) {
+        ahrs.set_compass(&compass);
+        // update offsets
+        compass.null_offsets();
+        if (g.log_bitmask & MASK_LOG_COMPASS) {
+            Log_Write_Compass();
+        }
+    } else {
+        ahrs.set_compass(NULL);
+    }
+}
+
+/*
+  log some key data - 10Hz
+ */
+static void update_logging(void)
+{
+    if ((g.log_bitmask & MASK_LOG_ATTITUDE_MED) && !(g.log_bitmask & MASK_LOG_ATTITUDE_FAST))
+        Log_Write_Attitude();
+    
+    if (g.log_bitmask & MASK_LOG_CTUN)
+        Log_Write_Control_Tuning();
+
+    if (g.log_bitmask & MASK_LOG_NTUN)
+        Log_Write_Nav_Tuning();
+}
+
+
+/*
+  update aux servo mappings
+ */
+static void update_aux(void)
+{
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8, &g.rc_9, &g.rc_10, &g.rc_11, &g.rc_12);
+#elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
+    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8, &g.rc_10, &g.rc_11);
+#else
+    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8);
 #endif
-				superslow_loopCounter = 0;
-			}
-			break;
-
-		case 1:
-			slow_loopCounter++;
-
-			// Read 3-position switch on radio
-			// -------------------------------
-			read_control_switch();
-
-			update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8);
-
+    enable_aux_servos();
+        
 #if MOUNT == ENABLED
-			camera_mount.update_mount_type();
+    camera_mount.update_mount_type();
 #endif
-			break;
-
-		case 2:
-			slow_loopCounter = 0;
-                        
-			update_events();
-
-            mavlink_system.sysid = g.sysid_this_mav;		// This is just an ugly hack to keep mavlink_system.sysid sync'd with our parameter
-
-#if USB_MUX_PIN > 0
-            check_usb_mux();
-#endif
-
-			break;
-	}
 }
 
-static void one_second_loop()
+/*
+  once a second events
+ */
+static void one_second_loop(void)
 {
-#if LITE == DISABLED
 	if (g.log_bitmask & MASK_LOG_CURRENT)
 		Log_Write_Current();
-#endif
 	// send a heartbeat
 	gcs_send_message(MSG_HEARTBEAT);
+
+    // allow orientation change at runtime to aid config
+    ahrs.set_orientation();
+
+    set_control_channels();
+
+    // cope with changes to aux functions
+    update_aux();
+
+#if MOUNT == ENABLED
+    camera_mount.update_mount_type();
+#endif
+
+    // cope with changes to mavlink system ID
+    mavlink_system.sysid = g.sysid_this_mav;
+
+    static uint8_t counter;
+
+    counter++;
+
+    // write perf data every 20s
+    if (counter == 20) {
+        if (g.log_bitmask & MASK_LOG_PM)
+            Log_Write_Performance();
+        resetPerfData();
+    }
+
+    // save compass offsets once a minute
+    if (counter >= 60) {				
+        if (g.compass_enabled) {
+            compass.save_offsets();
+        }
+        counter = 0;
+    }
 }
 
 static void update_GPS(void)
 {        
+    static uint32_t last_gps_reading;
 	g_gps->update();
-	update_GPS_light();
 
-    have_position = ahrs.get_position(&current_loc);
+    if (g_gps->last_message_time_ms() != last_gps_reading) {
+        last_gps_reading = g_gps->last_message_time_ms();
+        if (g.log_bitmask & MASK_LOG_GPS) {
+            DataFlash.Log_Write_GPS(g_gps, current_loc.alt);
+        }
+    }
 
-	if (g_gps->new_data && g_gps->status() == GPS::GPS_OK) {
+    have_position = ahrs.get_projected_position(current_loc);
+
+	if (g_gps->new_data && g_gps->status() >= GPS::GPS_OK_FIX_3D) {
 		gps_fix_count++;
 
 		if(ground_start_count > 1){
 			ground_start_count--;
-			ground_start_avg += g_gps->ground_speed;
+			ground_start_avg += g_gps->ground_speed_cm;
 
 		} else if (ground_start_count == 1) {
 			// We countdown N number of good GPS fixes
@@ -912,7 +839,13 @@ static void update_GPS(void)
 				ground_start_count = 0;
 			}
 		}
-        ground_speed   = g_gps->ground_speed * 0.01;
+        ground_speed   = g_gps->ground_speed_cm * 0.01;
+
+#if CAMERA == ENABLED
+        if (camera.update_location(current_loc) == true) {
+            do_take_picture();
+        }
+#endif        
 	}
 }
 
@@ -922,14 +855,51 @@ static void update_current_mode(void)
     case AUTO:
     case RTL:
     case GUIDED:
+        calc_lateral_acceleration();
         calc_nav_steer();
-        calc_throttle();
+        calc_throttle(g.speed_cruise);
         break;
+
+    case STEERING: {
+        /*
+          in steering mode we control lateral acceleration
+          directly. We first calculate the maximum lateral
+          acceleration at full steering lock for this speed. That is
+          V^2/R where R is the radius of turn. We get the radius of
+          turn from half the STEER2SRV_P.
+         */
+        float max_g_force = ground_speed * ground_speed / steerController.get_turn_radius();
+
+        // constrain to user set TURN_MAX_G
+        max_g_force = constrain_float(max_g_force, 0.1f, g.turn_max_g * GRAVITY_MSS);
+
+        lateral_acceleration = max_g_force * (channel_steer->pwm_to_angle()/4500.0f);
+        calc_nav_steer();
+
+        // and throttle gives speed in proportion to cruise speed, up
+        // to 50% throttle, then uses nudging above that.
+        float target_speed = channel_throttle->pwm_to_angle() * 0.01 * 2 * g.speed_cruise;
+        target_speed = constrain_float(target_speed, 0, g.speed_cruise);
+        calc_throttle(target_speed);
+        break;
+    }
 
     case LEARNING:
     case MANUAL:
-        nav_steer        = 0;
-        g.channel_steer.servo_out = g.channel_steer.pwm_to_angle();
+        /*
+          in both MANUAL and LEARNING we pass through the
+          controls. Setting servo_out here actually doesn't matter, as
+          we set the exact value in set_servos(), but it helps for
+          logging
+         */
+        channel_throttle->servo_out = channel_throttle->control_in;
+        channel_steer->servo_out = channel_steer->pwm_to_angle();
+        break;
+
+    case HOLD:
+        // hold position - stop motors and center steering
+        channel_throttle->servo_out = 0;
+        channel_steer->servo_out = 0;
         break;
 
     case INITIALISING:
@@ -941,7 +911,9 @@ static void update_navigation()
 {
     switch (control_mode) {
     case MANUAL:
+    case HOLD:
     case LEARNING:
+    case STEERING:
     case INITIALISING:
         break;
 
@@ -952,11 +924,11 @@ static void update_navigation()
     case RTL:
     case GUIDED:
         // no loitering around the wp with the rover, goes direct to the wp position
+        calc_lateral_acceleration();
         calc_nav_steer();
-        calc_bearing_error();
         if (verify_RTL()) {  
-            g.channel_throttle.servo_out = g.throttle_min.get();
-            set_mode(MANUAL);
+            channel_throttle->servo_out = g.throttle_min.get();
+            set_mode(HOLD);
         }
         break;
 	}

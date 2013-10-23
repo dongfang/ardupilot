@@ -46,9 +46,8 @@ else
   endif
 endif
 ifneq ($(findstring CYGWIN, $(SYSTYPE)),) 
-	# Convert cygwin path into a windows normal path
-    SKETCHBOOK	:=	$(shell cygpath -d ${SKETCHBOOK})
-    SKETCHBOOK	:=	$(subst \,/,$(SKETCHBOOK))
+    # Convert cygwin path into a windows normal path
+    SKETCHBOOK	:= $(shell cygpath ${SKETCHBOOK})
 endif
 
 #
@@ -65,13 +64,23 @@ endif
 # Work out where we are going to be building things
 #
 TMPDIR			?=	/tmp
+
+ifneq ($(findstring px4, $(MAKECMDGOALS)),)
+# when building px4 we need all sources to be inside the sketchbook directory
+# as the NuttX build system relies on it
+BUILDROOT		:=	$(SKETCHBOOK)/Build.$(SKETCH)
+else
 BUILDROOT		:=	$(abspath $(TMPDIR)/$(SKETCH).build)
+endif
+
 ifneq ($(findstring CYGWIN, $(SYSTYPE)),)
   # Workaround a $(abspath ) bug on cygwin
   ifeq ($(BUILDROOT),)
     BUILDROOT	:=	C:$(TMPDIR)/$(SKETCH).build
     $(warning your abspath function is not working)
     $(warning > setting BUILDROOT to $(BUILDROOT))
+  else
+    BUILDROOT	:=	$(shell cygpath ${BUILDROOT})
   endif
 endif
 
@@ -102,6 +111,10 @@ ifneq ($(findstring sitl, $(MAKECMDGOALS)),)
 HAL_BOARD = HAL_BOARD_AVR_SITL
 endif
 
+ifneq ($(findstring linux, $(MAKECMDGOALS)),)
+HAL_BOARD = HAL_BOARD_LINUX
+endif
+
 ifneq ($(findstring vrbrain, $(MAKECMDGOALS)),)
 HAL_BOARD = HAL_BOARD_VRBRAIN
 endif
@@ -114,6 +127,10 @@ ifneq ($(findstring apm2, $(MAKECMDGOALS)),)
 HAL_BOARD = HAL_BOARD_APM2
 endif
 
+ifneq ($(findstring flymaple, $(MAKECMDGOALS)),)
+HAL_BOARD = HAL_BOARD_FLYMAPLE
+endif
+
 # default to APM2
 ifeq ($(HAL_BOARD),)
 #$(warning No HAL_BOARD in config.mk - defaulting to HAL_BOARD_APM2)
@@ -123,6 +140,10 @@ endif
 HARDWARE		?=	arduino
 ifeq ($(BOARD),)
 BOARD = mega2560
+endif
+
+ifneq ($(findstring apm1-1280, $(MAKECMDGOALS)),)
+BOARD = mega
 endif
 
 endif

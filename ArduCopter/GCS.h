@@ -122,6 +122,8 @@ public:
     // see if we should send a stream now. Called at 50Hz
     bool        stream_trigger(enum streams stream_num);
 
+    // call to reset the timeout window for entering the cli
+    void reset_cli_timeout();
 private:
     void        handleMessage(mavlink_message_t * msg);
 
@@ -165,6 +167,7 @@ private:
 
     // waypoints
     uint16_t        waypoint_request_i; // request index
+    uint16_t        waypoint_request_last; // last request index
     uint16_t        waypoint_dest_sysid; // where to send requests
     uint16_t        waypoint_dest_compid; // "
     bool            waypoint_sending; // currently in send process
@@ -192,6 +195,10 @@ private:
 
     // number of extra ticks to add to slow things down for the radio
     uint8_t         stream_slowdown;
+
+    // millis value to calculate cli timeout relative to.
+    // exists so we can separate the cli entry time from the system start time
+    uint32_t _cli_timeout;
 };
 
 #endif // __GCS_H
