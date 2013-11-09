@@ -88,7 +88,7 @@ void print_vprintf (AP_HAL::Print *s, unsigned char in_progmem, const char *fmt,
                         if (!c) return;
                         if (c == '%') {
                                 c = GETBYTE (in_progmem, 1, fmt);
-                                if (c != '%') break;
+                                if (c != '%') break; // %% is a % literally
                         }
                         /* emit cr before lf to make most terminals happy */
                         if (c == '\n')
@@ -127,26 +127,27 @@ void print_vprintf (AP_HAL::Print *s, unsigned char in_progmem, const char *fmt,
                         if (flags < FL_LONG) {
                                 if (c >= '0' && c <= '9') {
                                         c -= '0';
-                                        if (flags & FL_PREC) {
+                                        if (flags & FL_PREC) {	 // precision
                                                 prec = 10*prec + c;
-                                                continue;
+                                                continue;		// and no width update stuff
                                         }
-                                        width = 10*width + c;
+                                        width = 10*width + c;	// width
                                         flags |= FL_WIDTH;
                                         continue;
                                 }
                                 if (c == '.') {
-                                        if (flags & FL_PREC)
+                                        if (flags & FL_PREC)	// ?? so width is before . and prec is after...
                                                 return;
                                         flags |= FL_PREC;
                                         continue;
                                 }
-                                if (c == 'l') {
+                                if (c == 'l') {					// If seeing an l we dont look at width, precision, . or h any more.
                                         flags |= FL_LONG;
                                         continue;
                                 }
-                                if (c == 'h')
+                                if (c == 'h')					// Same treatment as any other non match?
                                         continue;
+                                // all other blahblah is ignored.
                         }
             
                         break;
@@ -193,6 +194,7 @@ void print_vprintf (AP_HAL::Print *s, unsigned char in_progmem, const char *fmt,
                                 vtype = prec;
                                 ndigs = 0;
                         }
+
                         memset(buf, 0, sizeof(buf));
                         exp = ftoa_engine(value, (char *)buf, vtype, ndigs);
                         vtype = buf[0];
@@ -234,6 +236,7 @@ void print_vprintf (AP_HAL::Print *s, unsigned char in_progmem, const char *fmt,
                         /* Output format adjustment, number of decimal digits in buf[] */
                         if (flags & FL_FLTFIX) {
                                 ndigs += exp;
+                                // The carry flag indicates that the engine has had an overflow and generated one less digit.
                                 if ((vtype & FTOA_CARRY) && buf[1] == '1')
                                         ndigs -= 1;
                                 if ((signed char)ndigs < 1)
@@ -313,7 +316,7 @@ void print_vprintf (AP_HAL::Print *s, unsigned char in_progmem, const char *fmt,
                                 /* exponent     */
                                 s->write(flags & FL_FLTUPP ? 'E' : 'e');
                                 ndigs = '+';
-                                if (exp < 0 || (exp == 0 && (vtype & FTOA_CARRY) != 0)) {
+                                if (exp < 0 || (exp == 0 && (vtype & FTOA_CARRY) != 0)) { // zero exp. and a carry means..?
                                         exp = -exp;
                                         ndigs = '-';
                                 }

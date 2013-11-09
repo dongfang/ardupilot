@@ -79,6 +79,10 @@
  #endif
 #endif
 
+#ifndef SERIAL3_MODE
+ # define SERIAL3_MODE ENABLED
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 // main board differences
 //
@@ -528,4 +532,3 @@
 #ifndef SERIAL2_BUFSIZE
  # define SERIAL2_BUFSIZE 256
 #endif
-

@@ -457,4 +457,3 @@ set_servos_4()
 #endif
     motors.output();
 }
-

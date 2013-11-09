@@ -345,6 +345,7 @@ uint8_t oldSwitchPosition;
 // This is used to enable the inverted flight feature
 bool inverted_flight     = false;
 
+// These values are in us-space and not in centidegree-space...
 static struct {
     // These are trim values used for elevon control
     // For elevons radio_in[CH_ROLL] and radio_in[CH_PITCH] are
@@ -824,7 +825,6 @@ static void update_speed_height(void)
     }
 }
 
-
 /*
   update camera mount
  */
@@ -1150,7 +1150,7 @@ static void update_flight_mode(void)
         calc_nav_pitch();
         calc_throttle();
         break;
-        
+
     case TRAINING: {
         training_manual_roll = false;
         training_manual_pitch = false;
@@ -1276,6 +1276,9 @@ static void update_flight_mode(void)
     }
 }
 
+/*
+ * Called (only) from navigate() in navigation.pde (why not just move it to there)
+ */
 static void update_navigation()
 {
     // wp_distance is in ACTUAL meters, not the *100 meters we get from the GPS
@@ -1310,9 +1313,7 @@ static void update_navigation()
     }
 }
 
-
-static void update_alt()
-{
+static void update_alt() {
     // this function is in place to potentially add a sonar sensor in the future
     //altitude_sensor = BARO;
 
@@ -1356,4 +1357,6 @@ static void update_alt()
     airspeed.set_EAS2TAS(barometer.get_EAS2TAS());
 }
 
+// This is a replacement main() function macro. It does hal init, setup(), scheduler start 
+// and runs loop() forever.
 AP_HAL_MAIN();

@@ -16,11 +16,11 @@
  # define MNT_STABILIZE_OPTION  DISABLED // stabilize camera using frame attitude information
  # define MNT_MOUNT2_OPTION     DISABLED // second mount, can for example be used to keep an antenna pointed at the home position
 #else
- # define MNT_JSTICK_SPD_OPTION ENABLED // uses  844 bytes of memory
- # define MNT_RETRACT_OPTION    ENABLED // uses  244 bytes of memory
- # define MNT_GPSPOINT_OPTION   ENABLED // uses  580 bytes of memory
- # define MNT_STABILIZE_OPTION  ENABLED // uses 2424 bytes of memory
- # define MNT_MOUNT2_OPTION     ENABLED // uses   58 bytes of memory (must also be enabled in APM_Config.h)
+ # define MNT_JSTICK_SPD_OPTION DISABLED // uses  844 bytes of memory
+ # define MNT_RETRACT_OPTION    DISABLED // uses  244 bytes of memory
+ # define MNT_GPSPOINT_OPTION   ENABLED  // uses  580 bytes of memory
+ # define MNT_STABILIZE_OPTION  ENABLED  // uses 2424 bytes of memory
+ # define MNT_MOUNT2_OPTION     DISABLED // uses   58 bytes of memory (must also be enabled in APM_Config.h)
 #endif
 
 const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {

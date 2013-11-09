@@ -146,13 +146,29 @@ static void init_ardupilot()
     ap.usb_connected = true;
     check_usb_mux();
 
-#if CONFIG_HAL_BOARD != HAL_BOARD_APM2
+    //#if CONFIG_HAL_BOARD != HAL_BOARD_APM2
     // we have a 2nd serial port for telemetry on all boards except
     // APM2. We actually do have one on APM2 but it isn't necessary as
     // a MUX is used 
     hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
     gcs3.init(hal.uartC);
-#endif
+    //#endif
+
+    // Originally, gcs3 would not get initialized if there was a multiplexer pin
+    // defined. That would defeat UART2 telemetry on all APM2s. If would however
+    // be nice if we could connect a 3DR or XBee to uartA _and_ a further telemetry
+    // system to uartC. I have changed the meaning of USB_MUX_PIN to _not_ determine
+    // which serial ports should be inited, and added the SERIAL3_MODE define to decide
+    // what kind of telemetry HW should be expected at the 2nd UART:
+    // SERIAL3_MODE==DISABLED (0): Disabled.
+    // SERIAL3_MODE==ENALBED  (1): Raw MAVLink for a XBee or similar.
+    // SERIAL3_MODE==MOBILE   (2): DroneCell data-via-commands
+
+    #if SERIAL3_MODE == ENABLED
+    // we have a 2nd serial port for telemetry
+        hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+        gcs3.init(hal.uartC);
+    #endif
 
     // identify ourselves correctly with the ground station
     mavlink_system.sysid = g.sysid_this_mav;
