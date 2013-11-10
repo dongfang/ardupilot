@@ -3,12 +3,23 @@
 #ifndef __AP_AHRS_H__
 #define __AP_AHRS_H__
 /*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
  *  AHRS (Attitude Heading Reference System) interface for ArduPilot
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
  */
 
 #include <AP_Math.h>
@@ -26,7 +37,7 @@ class AP_AHRS
 {
 public:
     // Constructor
-    AP_AHRS(AP_InertialSensor *ins, GPS *&gps) :
+    AP_AHRS(AP_InertialSensor &ins, GPS *&gps) :
         _ins(ins),
         _gps(gps)
     {
@@ -38,7 +49,7 @@ public:
         // prone than the APM1, so we should have a lower ki,
         // which will make us less prone to increasing omegaI
         // incorrectly due to sensor noise
-        _gyro_drift_limit = ins->get_gyro_drift_rate();
+        _gyro_drift_limit = ins.get_gyro_drift_rate();
 
         // enable centrifugal correction by default
         _flags.correct_centrifugal = true;
@@ -67,7 +78,7 @@ public:
     // allow for runtime change of orientation
     // this makes initial config easier
     void set_orientation() {
-        _ins->set_board_orientation((enum Rotation)_board_orientation.get());
+        _ins.set_board_orientation((enum Rotation)_board_orientation.get());
         if (_compass != NULL) {
             _compass->set_board_orientation((enum Rotation)_board_orientation.get());
         }
@@ -77,7 +88,7 @@ public:
         _airspeed = airspeed;
     }
 
-    AP_InertialSensor* get_ins() const {
+    const AP_InertialSensor &get_ins() const {
 	    return _ins;
     }
 
@@ -128,18 +139,21 @@ public:
     // dead-reckoning. Return true if a position is available,
     // otherwise false. This only updates the lat and lng fields
     // of the Location
-    virtual bool get_position(struct Location *loc) {
+    virtual bool get_position(struct Location &loc) {
         if (!_gps || _gps->status() <= GPS::NO_FIX) {
             return false;
         }
-        loc->lat = _gps->latitude;
-        loc->lng = _gps->longitude;
+        loc.lat = _gps->latitude;
+        loc.lng = _gps->longitude;
         return true;
     }
 
     // get our projected position, based on our GPS position plus
     // heading and ground speed
-    bool get_projected_position(struct Location *loc);
+    bool get_projected_position(struct Location &loc);
+
+    // return the estimated lag in our position due to GPS lag
+    float get_position_lag(void) const;
 
     // return a wind estimation vector, in m/s
     virtual Vector3f wind_estimate(void) {
@@ -177,8 +191,16 @@ public:
     // return a ground vector estimate in meters/second, in North/East order
     Vector2f groundspeed_vector(void);
 
+    // return ground speed estimate in meters/second. Used by ground vehicles.
+    float groundspeed(void) const {
+        if (!_gps || _gps->status() <= GPS::NO_FIX) {
+            return 0.0f;
+        }
+        return _gps->ground_speed_cm * 0.01f;
+    }
+
     // return true if we will use compass for yaw
-    virtual bool use_compass(void) const { return _compass && _compass->use_for_yaw(); }
+    virtual bool use_compass(void) { return _compass && _compass->use_for_yaw(); }
 
     // return true if yaw has been initialised
     bool yaw_initialised(void) const {
@@ -220,6 +242,7 @@ protected:
     AP_Int8 _wind_max;
     AP_Int8 _board_orientation;
     AP_Int8 _gps_minsats;
+    AP_Int8 _gps_delay;
 
     // flags structure
     struct ahrs_flags {
@@ -241,7 +264,7 @@ protected:
 
     // note: we use ref-to-pointer here so that our caller can change the GPS without our noticing
     //       IMU under us without our noticing.
-    AP_InertialSensor   *_ins;
+    AP_InertialSensor   &_ins;
     GPS                 *&_gps;
 
     // a vector to capture the difference between the controller and body frames
@@ -262,7 +285,6 @@ protected:
 };
 
 #include <AP_AHRS_DCM.h>
-#include <AP_AHRS_MPU6000.h>
 #include <AP_AHRS_HIL.h>
 
 #endif // __AP_AHRS_H__

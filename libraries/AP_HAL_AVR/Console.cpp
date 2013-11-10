@@ -1,3 +1,5 @@
+/*
+
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #include <AP_HAL.h>
@@ -89,3 +91,4 @@ size_t AVRConsoleDriver::write(uint8_t c) {
 
 #endif // CONFIG_HAL_BOARD
 
+*/

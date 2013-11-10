@@ -1,3 +1,4 @@
+/*
 
 #ifndef __AP_HAL_AVR_CONSOLE_DRIVER_H__
 #define __AP_HAL_AVR_CONSOLE_DRIVER_H__
@@ -15,7 +16,7 @@ public:
     size_t backend_read(uint8_t *data, size_t len);
     size_t backend_write(const uint8_t *data, size_t len);
 
-    /* Implementations of BetterStream virtual methods */
+    / * Implementations of BetterStream virtual methods * /
     void print_P(const prog_char_t *s);
     void println_P(const prog_char_t *s);
     void printf(const char *s, ...)
@@ -26,13 +27,13 @@ public:
     void vprintf(const char *s, va_list ap);
     void vprintf_P(const prog_char *s, va_list ap);
 
-    /* Implementations of Stream virtual methods */
+    / * Implementations of Stream virtual methods * /
     int16_t available();
     int16_t txspace();
     int16_t read();
     int16_t peek();
 
-    /* Implementations of Print virtual methods */
+    / * Implementations of Print virtual methods * /
     size_t write(uint8_t c);
 
 private:
@@ -40,3 +41,5 @@ private:
 };
 
 #endif // __AP_HAL_AVR_CONSOLE_DRIVER_H__
+
+*/

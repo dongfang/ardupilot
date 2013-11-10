@@ -1,10 +1,18 @@
 /*
-	APM_AHRS.cpp
+  APM_AHRS.cpp
 
-	This library is free software; you can redistribute it and/or
-	modify it under the terms of the GNU Lesser General Public License
-	as published by the Free Software Foundation; either version 2.1
-	of the License, or (at your option) any later version.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+  
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <AP_AHRS.h>
 #include <AP_HAL.h>
@@ -33,14 +41,14 @@ const AP_Param::GroupInfo AP_AHRS::var_info[] PROGMEM = {
     // @Description: This controls the weight the compass or GPS has on the heading. A higher value means the heading will track the yaw source (GPS or compass) more rapidly.
     // @Range: 0.1 0.4
     // @Increment: .01
-    AP_GROUPINFO("YAW_P", 4,    AP_AHRS, _kp_yaw, 0.3f),
+    AP_GROUPINFO("YAW_P", 4,    AP_AHRS, _kp_yaw, 0.2f),
 
     // @Param: RP_P
     // @DisplayName: AHRS RP_P
     // @Description: This controls how fast the accelerometers correct the attitude
     // @Range: 0.1 0.4
     // @Increment: .01
-    AP_GROUPINFO("RP_P",  5,    AP_AHRS, _kp, 0.3f),
+    AP_GROUPINFO("RP_P",  5,    AP_AHRS, _kp, 0.2f),
 
     // @Param: WIND_MAX
     // @DisplayName: Maximum wind
@@ -77,7 +85,7 @@ const AP_Param::GroupInfo AP_AHRS::var_info[] PROGMEM = {
     // @Param: ORIENTATION
     // @DisplayName: Board Orientation
     // @Description: Overall board orientation relative to the standard orientation for the board type. This rotates the IMU and compass readings to allow the board to be oriented in your vehicle at any 90 or 45 degree angle. This option takes affect on next boot. After changing you will need to re-level your vehicle.
-    // @Values: 0:None,1:Yaw45,2:Yaw90,3:Yaw135,4:Yaw180,5:Yaw225,6:Yaw270,7:Yaw315,8:Roll180,9:Roll180Yaw45,10:Roll180Yaw90,11:Roll180Yaw135,12:Pitch180,13:Roll180Yaw225,14:Roll180Yaw270,15:Roll180Yaw315,16:Roll90,17:Roll90Yaw45,18:Roll90Yaw90,19:Roll90Yaw135,20:Roll270,21:Roll270Yaw45,22:Roll270Yaw90,23:Roll270Yaw135,24:Pitch90,25:Pitch270
+    // @Values: 0:None,1:Yaw45,2:Yaw90,3:Yaw135,4:Yaw180,5:Yaw225,6:Yaw270,7:Yaw315,8:Roll180,9:Roll180Yaw45,10:Roll180Yaw90,11:Roll180Yaw135,12:Pitch180,13:Roll180Yaw225,14:Roll180Yaw270,15:Roll180Yaw315,16:Roll90,17:Roll90Yaw45,18:Roll90Yaw90,19:Roll90Yaw135,20:Roll270,21:Roll270Yaw45,22:Roll270Yaw90,23:Roll270Yaw136,24:Pitch90,25:Pitch270,26:Pitch180Yaw90,27:Pitch180Yaw270,28:Roll90Pitch90,29:Roll180Pitch90,30:Roll270Pitch90,31:Roll90Pitch180,32:Roll270Pitch180,33:Roll90Pitch270,34:Roll180Pitch270,35:Roll270Pitch270,36:Roll90Pitch180Yaw90,37:Roll90Yaw270
     // @User: Advanced
     AP_GROUPINFO("ORIENTATION", 9, AP_AHRS, _board_orientation, 0),
 
@@ -96,6 +104,14 @@ const AP_Param::GroupInfo AP_AHRS::var_info[] PROGMEM = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("GPS_MINSATS", 11, AP_AHRS, _gps_minsats, 6),
+
+    // @Param: GPS_DELAY
+    // @DisplayName: AHRS GPS delay steps
+    // @Description: number of GPS samples to delay accels for synchronisation with the GPS velocity data
+    // @Range: 0 5
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("GPS_DELAY", 12, AP_AHRS, _gps_delay, 2),
 
     AP_GROUPEND
 };
@@ -203,11 +219,19 @@ Vector2f AP_AHRS::groundspeed_vector(void)
 /*
   get position projected by groundspeed and heading
  */
-bool AP_AHRS::get_projected_position(struct Location *loc)
+bool AP_AHRS::get_projected_position(struct Location &loc)
 {
         if (!get_position(loc)) {
 		return false;
         }
         location_update(loc, degrees(yaw), _gps->ground_speed_cm * 0.01 * _gps->get_lag());
         return true;
+}
+
+/*
+  get the GPS lag in seconds
+ */
+float AP_AHRS::get_position_lag(void) const
+{
+    return _gps->get_lag();
 }

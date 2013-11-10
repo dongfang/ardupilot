@@ -1,11 +1,21 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 //	Initial Code by Jon Challinger
 //  Modified by Paul Riseborough
-//	This library is free software; you can redistribute it and / or
-//	modify it under the terms of the GNU Lesser General Public
-//	License as published by the Free Software Foundation; either
-//	version 2.1 of the License, or (at your option) any later version.
 
 #include <AP_Math.h>
 #include <AP_HAL.h>
@@ -39,7 +49,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] PROGMEM = {
 	// @Range: 0 0.1
 	// @Increment: 0.01
 	// @User: User
-	AP_GROUPINFO("D",        2, AP_PitchController, _K_D,        0.0f),
+	AP_GROUPINFO("D",        2, AP_PitchController, _K_D,        0.02f),
 
 	// @Param: I
 	// @DisplayName: Integrator Gain
@@ -96,7 +106,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] PROGMEM = {
  4) minimum FBW airspeed (metres/sec)
  5) maximum FBW airspeed (metres/sec)
 */
-int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool stabilize, float aspeed)
+int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed)
 {
 	uint32_t tnow = hal.scheduler->millis();
 	uint32_t dt = tnow - _last_t;
@@ -106,22 +116,23 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	}
 	_last_t = tnow;
 	
-	if(_ahrs == NULL) return 0;
 	float delta_time    = (float)dt * 0.001f;
 	
 	// Get body rate vector (radians/sec)
-	float omega_y = _ahrs->get_gyro().y;
+	float omega_y = _ahrs.get_gyro().y;
 	
 	// Calculate the pitch rate error (deg/sec) and scale
 	float rate_error = (desired_rate - ToDeg(omega_y)) * scaler;
 	
 	// Multiply pitch rate error by _ki_rate and integrate
+	// Scaler is applied before integrator so that integrator state relates directly to elevator deflection
+	// This means elevator trim offset doesn't change as the value of scaler changes with airspeed
 	// Don't integrate if in stabilise mode as the integrator will wind up against the pilots inputs
-	if (!stabilize && _K_I > 0) {
+	if (!disable_integrator && _K_I > 0) {
         float ki_rate = _K_I * _tau;
 		//only integrate if gain and time step are positive and airspeed above min value.
 		if (dt > 0 && aspeed > 0.5f*float(aparm.airspeed_min)) {
-		    float integrator_delta = rate_error * ki_rate * delta_time;
+		    float integrator_delta = rate_error * ki_rate * delta_time * scaler;
 			if (_last_out < -45) {
 				// prevent the integrator from increasing if surface defln demand is above the upper limit
 				integrator_delta = max(integrator_delta , 0);
@@ -136,20 +147,20 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	}
 
     // Scale the integration limit
-    float intLimScaled = _imax * 0.01f / scaler;
+    float intLimScaled = _imax * 0.01f;
 
     // Constrain the integrator state
     _integrator = constrain_float(_integrator, -intLimScaled, intLimScaled);
 
 	// Calculate equivalent gains so that values for K_P and K_I can be taken across from the old PID law
     // No conversion is required for K_D
-	float kp_ff = max((_K_P - _K_I * _tau) * _tau  - _K_D , 0) / _ahrs->get_EAS2TAS();
+	float kp_ff = max((_K_P - _K_I * _tau) * _tau  - _K_D , 0) / _ahrs.get_EAS2TAS();
 	
 	// Calculate the demanded control surface deflection
 	// Note the scaler is applied again. We want a 1/speed scaler applied to the feed-forward
 	// path, but want a 1/speed^2 scaler applied to the rate error path. 
 	// This is because acceleration scales with speed^2, but rate scales with speed.
-	_last_out = ( (rate_error * _K_D) + _integrator + (desired_rate * kp_ff) ) * scaler;
+	_last_out = ( (rate_error * _K_D) + (desired_rate * kp_ff) ) * scaler + _integrator;
 	
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);
@@ -167,7 +178,12 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 */
 int32_t AP_PitchController::get_rate_out(float desired_rate, float scaler)
 {
-    return _get_rate_out(desired_rate, scaler, false, 0);
+    float aspeed;
+	if (!_ahrs.airspeed_estimate(&aspeed)) {
+	    // If no airspeed available use average of min and max
+        aspeed = 0.5f*(float(aparm.airspeed_min) + float(aparm.airspeed_max));
+	}
+    return _get_rate_out(desired_rate, scaler, false, aspeed);
 }
 
 /*
@@ -180,7 +196,7 @@ int32_t AP_PitchController::get_rate_out(float desired_rate, float scaler)
 float AP_PitchController::_get_coordination_rate_offset(float &aspeed, bool &inverted) const
 {
 	float rate_offset;
-	float bank_angle = _ahrs->roll;
+	float bank_angle = _ahrs.roll;
 
 	// limit bank angle between +- 80 deg if right way up
 	if (fabsf(bank_angle) < radians(90))	{
@@ -194,31 +210,20 @@ float AP_PitchController::_get_coordination_rate_offset(float &aspeed, bool &inv
 			bank_angle = constrain_float(bank_angle,-radians(180),-radians(100));
 		}
 	}
-	if (!_ahrs->airspeed_estimate(&aspeed)) {
+	if (!_ahrs.airspeed_estimate(&aspeed)) {
 	    // If no airspeed available use average of min and max
         aspeed = 0.5f*(float(aparm.airspeed_min) + float(aparm.airspeed_max));
 	}
-    if (abs(_ahrs->pitch_sensor) > 7000) {
+    if (abs(_ahrs.pitch_sensor) > 7000) {
         // don't do turn coordination handling when at very high pitch angles
         rate_offset = 0;
     } else {
-        rate_offset = fabsf(ToDeg((GRAVITY_MSS / max(aspeed , float(aparm.airspeed_min))) * tanf(bank_angle) * sinf(bank_angle))) * _roll_ff;
+        rate_offset = cosf(_ahrs.pitch)*fabsf(ToDeg((GRAVITY_MSS / max(aspeed , float(aparm.airspeed_min))) * tanf(bank_angle) * sinf(bank_angle))) * _roll_ff;
     }
 	if (inverted) {
 		rate_offset = -rate_offset;
 	}
     return rate_offset;
-}
-
-/*
-  get the rate offset in degrees/second needed for pitch in body frame
-  to maintain height in a coordinated turn.
- */
-float AP_PitchController::get_coordination_rate_offset(void) const
-{
-    float aspeed;
-    bool inverted;
-    return _get_coordination_rate_offset(aspeed, inverted);
 }
 
 // Function returns an equivalent elevator deflection in centi-degrees in the range from -4500 to 4500
@@ -230,7 +235,7 @@ float AP_PitchController::get_coordination_rate_offset(void) const
 // 4) minimum FBW airspeed (metres/sec)
 // 5) maximum FBW airspeed (metres/sec)
 //
-int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool stabilize)
+int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool disable_integrator)
 {
 	// Calculate offset to pitch rate demand required to maintain pitch angle whilst banking
 	// Calculate ideal turn rate from bank angle and airspeed assuming a level coordinated turn
@@ -266,7 +271,7 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
 	// Apply the turn correction offset
 	desired_rate = desired_rate + rate_offset;
 
-    return _get_rate_out(desired_rate, scaler, stabilize, aspeed);
+    return _get_rate_out(desired_rate, scaler, disable_integrator, aspeed);
 }
 
 void AP_PitchController::reset_I()

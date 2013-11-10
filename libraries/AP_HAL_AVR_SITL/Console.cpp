@@ -1,5 +1,7 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
+/* Deleted in master.
+
 #include <AP_HAL.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 
@@ -109,3 +111,5 @@ size_t SITLConsoleDriver::write(uint8_t c)
 
 
 #endif
+
+*/

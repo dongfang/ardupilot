@@ -1,12 +1,23 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
  *       AP_MotorsHeli.cpp - ArduCopter motors library
  *       Code by RandyMackay. DIYDrones.com
  *
- *       This library is free software; you can redistribute it and/or
- *   modify it under the terms of the GNU Lesser General Public
- *   License as published by the Free Software Foundation; either
- *   version 2.1 of the License, or (at your option) any later version.
  */
 #include <stdlib.h>
 #include <AP_HAL.h>
@@ -129,8 +140,8 @@ const AP_Param::GroupInfo AP_MotorsHeli::var_info[] PROGMEM = {
 
     // @Param: COLYAW
     // @DisplayName: Collective-Yaw Mixing
-    // @Description: This is a feed-forward compensation to automatically add rudder input when collective pitch is increased.
-    // @Range: 0 5
+    // @Description: This is a feed-forward compensation to automatically add rudder input when collective pitch is increased. Can be positive or negative depending on mechanics.
+    // @Range: -10 10
     AP_GROUPINFO("COLYAW",          14,     AP_MotorsHeli,  collective_yaw_effect, 0),
 
     // @Param: GOV_SETPOINT

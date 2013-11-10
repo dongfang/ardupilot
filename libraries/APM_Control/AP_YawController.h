@@ -5,30 +5,26 @@
 
 #include <AP_AHRS.h>
 #include <AP_Common.h>
-#include <AP_SpdHgtControl.h>
+#include <AP_Vehicle.h>
 #include <math.h>
 
 class AP_YawController {
 public:                      
-	AP_YawController(const AP_SpdHgtControl::AircraftParameters &parms) :
-		aparm(parms)
+	AP_YawController(AP_AHRS &ahrs, const AP_Vehicle::FixedWing &parms) :
+		aparm(parms),
+        _ahrs(ahrs)
 	{
 		AP_Param::setup_object_defaults(this, var_info);
 	}
 
-	void set_ahrs(AP_AHRS *ahrs) { 
-		_ahrs = ahrs; 
-		_ins = _ahrs->get_ins();
-	}
-
-	int32_t get_servo_out(float scaler = 1.0, bool stabilize = false);
+	int32_t get_servo_out(float scaler, bool disable_integrator);
 
 	void reset_I();
 
 	static const struct AP_Param::GroupInfo var_info[];
 
 private:
-	const AP_SpdHgtControl::AircraftParameters &aparm;
+	const AP_Vehicle::FixedWing &aparm;
 	AP_Float _K_A;
 	AP_Float _K_I;
 	AP_Float _K_D;
@@ -43,9 +39,7 @@ private:
 
 	float _integrator;
 
-	AP_AHRS *_ahrs;
-	AP_InertialSensor *_ins;
-
+	AP_AHRS &_ahrs;
 };
 
 #endif // __AP_YAW_CONTROLLER_H__
