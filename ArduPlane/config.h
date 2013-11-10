@@ -532,8 +532,6 @@
 #ifndef SERIAL2_BUFSIZE
  # define SERIAL2_BUFSIZE 256
 #endif
-<<<<<<< HEAD
-=======
 
 /*
   build a firmware version string.
@@ -544,4 +542,3 @@
 #else
 #define FIRMWARE_STRING THISFIRMWARE " (" GIT_VERSION ")"
 #endif
->>>>>>> diydrones/master
