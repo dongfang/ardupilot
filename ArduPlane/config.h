@@ -83,7 +83,7 @@
 // This is now independent of whether you have a mux or not.
 #define MOBILE 2
 #ifndef SERIAL3_MODE
- # define SERIAL3_MODE DISABLED
+ # define SERIAL3_MODE MOBILE
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -94,21 +94,6 @@
  # define CONFIG_BARO     AP_BARO_BMP085
  # define CONFIG_COMPASS  AP_COMPASS_HMC5843
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
-<<<<<<< HEAD
- # define A_LED_PIN        27
- # define B_LED_PIN        26
- # define C_LED_PIN        25
- # define LED_ON           LOW
- # define LED_OFF          HIGH
-// #if TELEMETRY_UART2 == ENABLED
-//  # define USB_MUX_PIN -1
- //#else
-  //# define USB_MUX_PIN 23
- //#endif
- # define BATTERY_VOLT_PIN      1      // Battery voltage on A1
- # define BATTERY_CURR_PIN      2      // Battery current on A2
-=======
->>>>>>> diydrones/master
  # define CONFIG_INS_TYPE CONFIG_INS_MPU6000
  # ifdef APM2_BETA_HARDWARE
  #  define CONFIG_BARO     AP_BARO_BMP085
@@ -544,11 +529,7 @@
 #endif
 
 #ifndef SERIAL_BUFSIZE
-<<<<<<< HEAD
- # define SERIAL_BUFSIZE 128
-#endif
-=======
- # define SERIAL_BUFSIZE 512
+ # define SERIAL_BUFSIZE 256
 #endif
 
 #ifndef SERIAL2_BUFSIZE
@@ -564,4 +545,3 @@
 #else
 #define FIRMWARE_STRING THISFIRMWARE " (" GIT_VERSION ")"
 #endif
->>>>>>> diydrones/master

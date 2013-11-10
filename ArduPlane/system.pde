@@ -112,7 +112,6 @@ static void init_ardupilot()
     // more than 5ms remaining in your call to hal.scheduler->delay
     hal.scheduler->register_delay_callback(mavlink_delay_cb, 5);
 
-<<<<<<< HEAD
     // we start by assuming USB connected, as we initialed the serial
     // port with SERIAL0_BAUD. check_usb_mux() fixes this if need be.    
     usb_connected = true;

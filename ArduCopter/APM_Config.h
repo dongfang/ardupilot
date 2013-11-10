@@ -17,11 +17,10 @@
  *  HELI_FRAME
  */
 
-<<<<<<< HEAD
 #define MOBILE 2
 // OFF is off. ON is raw MAVLink. MOBILE is cellular modem.
 #define SERIAL3_MODE MOBILE
-=======
+
 // uncomment the lines below to save on flash space if compiling for the APM using Arduino IDE.  Top items save the most flash space
 //#define CLI_ENABLED           DISABLED            // disable the CLI (command-line-interface) to save 21K of flash space
 //#define LOGGING_ENABLED       DISABLED            // disable dataflash logging to save 11K of flash space
@@ -42,7 +41,6 @@
 //#define THROTTLE_IN_DEADBAND   100
 
 //#define HIL_MODE              HIL_MODE_SENSORS    // build for hardware-in-the-loop simulation
->>>>>>> diydrones/master
 
 // User Hooks : For User Developed code that you wish to run
 // Put your variable definitions into the UserVariables.h file (or another file name and then change the #define below).

@@ -142,29 +142,11 @@ static void init_ardupilot()
     // anytime there are more than 5ms remaining in a call to
     // hal.scheduler->delay.
     hal.scheduler->register_delay_callback(mavlink_delay_cb, 5);
-<<<<<<< HEAD
-    
-#if USB_MUX_PIN > 0
-    if (!ap_system.usb_connected) {
-        // we are not connected via USB, re-init UART0 with right
-        // baud rate
-        hal.uartA->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD));
-    }
-=======
 
     // we start by assuming USB connected, as we initialed the serial
     // port with SERIAL0_BAUD. check_usb_mux() fixes this if need be.
     ap.usb_connected = true;
     check_usb_mux();
-
-#if CONFIG_HAL_BOARD != HAL_BOARD_APM2
-    // we have a 2nd serial port for telemetry on all boards except
-    // APM2. We actually do have one on APM2 but it isn't necessary as
-    // a MUX is used
-    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
-    gcs3.init(hal.uartC);
->>>>>>> diydrones/master
-#endif
 
     // Originally, gcs3 would not get initialized if there was a multiplexer pin
     // defined. That would defeat UART2 telemetry on all APM2s. If would however

@@ -1156,21 +1156,7 @@ static void update_flight_mode(void)
         effective_mode = FLY_BY_WIRE_A;
     }
 
-<<<<<<< HEAD
-        default:
-            // we are doing normal AUTO flight, the special cases
-            // are for takeoff and landing
-            hold_course_cd = -1;
-            land_complete = false;
-            calc_nav_roll();
-            calc_nav_pitch();
-            calc_throttle();
-            break;
-        }
-    } else { // control_mode is not AUTO
-=======
     if (effective_mode != AUTO) {
->>>>>>> diydrones/master
         // hold_course is only used in takeoff and landing
         steer_state.hold_course_cd = -1;
     }
@@ -1235,26 +1221,9 @@ static void update_flight_mode(void)
         break;
     }
 
-<<<<<<< HEAD
-        case FLY_BY_WIRE_A: {
-            // set nav_roll and nav_pitch using sticks
-            // dongfang: Is this necessary? norm_input() should not return more than +-1.
-            nav_roll_cd  = channel_roll->norm_input() * g.roll_limit_cd;
-            nav_roll_cd = constrain_int32(nav_roll_cd, -g.roll_limit_cd, g.roll_limit_cd);
-            float pitch_input = channel_pitch->norm_input();
-            if (pitch_input > 0) {
-                nav_pitch_cd = pitch_input * aparm.pitch_limit_max_cd;
-            } else {
-                nav_pitch_cd = -(pitch_input * aparm.pitch_limit_min_cd);
-            }
-            nav_pitch_cd = constrain_int32(nav_pitch_cd, aparm.pitch_limit_min_cd.get(), aparm.pitch_limit_max_cd.get());
-            if (inverted_flight) {
-                nav_pitch_cd = -nav_pitch_cd;
-            }
-            break;
-=======
     case FLY_BY_WIRE_A: {
         // set nav_roll and nav_pitch using sticks
+        // dongfang: Is this necessary? norm_input() should not return more than +-1.
         nav_roll_cd  = channel_roll->norm_input() * roll_limit_cd;
         nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
         float pitch_input = channel_pitch->norm_input();
@@ -1266,7 +1235,6 @@ static void update_flight_mode(void)
         nav_pitch_cd = constrain_int32(nav_pitch_cd, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
         if (inverted_flight) {
             nav_pitch_cd = -nav_pitch_cd;
->>>>>>> diydrones/master
         }
         if (failsafe.ch3_failsafe && g.short_fs_action == 2) {
             // FBWA failsafe glide
@@ -1276,64 +1244,6 @@ static void update_flight_mode(void)
         break;
     }
 
-<<<<<<< HEAD
-        case FLY_BY_WIRE_B:
-            // Thanks to Yury MonZon for the altitude limit code!
-            nav_roll_cd = channel_roll->norm_input() * g.roll_limit_cd;
-            update_fbwb_speed_height();
-            break;
-
-        case CRUISE:
-            /*
-              in CRUISE mode we use the navigation code to control
-              roll when heading is locked. Heading becomes unlocked on
-              any aileron or rudder input
-             */
-            if ((channel_roll->control_in != 0 ||
-                 channel_rudder->control_in != 0)) {                
-                cruise_state.locked_heading = false;
-                cruise_state.lock_timer_ms = 0;
-            }                 
-
-            if (!cruise_state.locked_heading) {
-                nav_roll_cd = channel_roll->norm_input() * g.roll_limit_cd;
-            } else {
-                calc_nav_roll();
-            }
-            update_fbwb_speed_height();
-            break;
-
-        case STABILIZE:
-            nav_roll_cd        = 0;
-            nav_pitch_cd       = 0;
-            // throttle is passthrough
-            break;
-
-        case CIRCLE:
-            // we have no GPS installed and have lost radio contact
-            // or we just want to fly around in a gentle circle w/o GPS,
-            // holding altitude at the altitude we set when we
-            // switched into the mode
-            nav_roll_cd  = g.roll_limit_cd / 3;
-            calc_nav_pitch();
-            calc_throttle();
-            break;
-
-        case MANUAL:
-            // servo_out is for Sim control only
-        	// What??? Why not use control_in?
-            // ---------------------------------
-            channel_roll->servo_out = channel_roll->pwm_to_angle();
-            channel_pitch->servo_out = channel_pitch->pwm_to_angle();
-            channel_rudder->servo_out = channel_rudder->pwm_to_angle();
-            break;
-            //roll: -13788.000,  pitch: -13698.000,   thr: 0.000, rud: -13742.000
-
-        case INITIALISING:
-        case AUTO:
-            // handled elsewhere
-            break;
-=======
     case FLY_BY_WIRE_B:
         // Thanks to Yury MonZon for the altitude limit code!
         nav_roll_cd = channel_roll->norm_input() * roll_limit_cd;
@@ -1356,7 +1266,6 @@ static void update_flight_mode(void)
             nav_roll_cd = channel_roll->norm_input() * roll_limit_cd;
         } else {
             calc_nav_roll();
->>>>>>> diydrones/master
         }
         update_fbwb_speed_height();
         break;
