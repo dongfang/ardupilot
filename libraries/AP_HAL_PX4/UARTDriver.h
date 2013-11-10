@@ -37,6 +37,7 @@ public:
     }
 
 private:
+    int16_t input(uint8_t consume);
     const char *_devpath;
     int _fd;
     uint32_t _baudrate;

@@ -221,7 +221,7 @@ int16_t PX4UARTDriver::txspace()
 /*
   read one byte from the read buffer
  */
-int16_t PX4UARTDriver::read() 
+int16_t PX4UARTDriver::input(uint8_t consume)
 { 
 	uint8_t c;
     if (!_initialised) {
@@ -235,8 +235,18 @@ int16_t PX4UARTDriver::read()
         return -1;
     }
     c = _readbuf[_readbuf_head];
-    BUF_ADVANCEHEAD(_readbuf, 1);
+    if (consume) BUF_ADVANCEHEAD(_readbuf, 1);
 	return c;
+}
+
+int16_t PX4UARTDriver::read()
+{
+	return input(1);
+}
+
+int16_t PX4UARTDriver::peek()
+{
+	return input(0);
 }
 
 /* 
