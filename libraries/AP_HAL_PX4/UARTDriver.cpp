@@ -110,6 +110,10 @@ void PX4UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
 	}
 
     if (_writebuf_size != 0 && _readbuf_size != 0 && _fd != -1) {
+        if (!_initialised) {
+            ::printf("initialised %s OK %u %u\n", _devpath, 
+                     (unsigned)_writebuf_size, (unsigned)_readbuf_size);
+        }
         _initialised = true;
     }
 }
@@ -413,6 +417,11 @@ void PX4UARTDriver::_timer_tick(void)
     uint16_t n;
 
     if (!_initialised) return;
+
+    // don't try IO on a disconnected USB port
+    if (strcmp(_devpath, "/dev/ttyACM0") == 0 && !hal.gpio->usb_connected()) {
+        return;
+    }
 
     _in_timer = true;
 

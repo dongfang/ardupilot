@@ -49,8 +49,8 @@ public:
 	AP_Float baro_noise;  // in Pascals
 	AP_Float gyro_noise;  // in degrees/second
 	AP_Float accel_noise; // in m/s/s
+	AP_Float aspd_noise;  // in m/s
 	AP_Float mag_noise;   // in mag units (earth field is 818)
-	AP_Float aspd_noise;  // in m/s 
 	AP_Float mag_error;   // in degrees
     AP_Float servo_rate;  // servo speed in degrees/second
 
@@ -65,6 +65,7 @@ public:
     AP_Vector3f  gps_glitch;  // glitch offsets in lat, lon and altitude
     AP_Int8  gps_hertz;   // GPS update rate in Hz
     AP_Float batt_voltage; // battery voltage base
+    AP_Float accel_fail;  // accelerometer failure value
 
     // wind control
     AP_Float wind_speed;

@@ -49,6 +49,12 @@ def get_bearing(loc1, loc2):
         bearing += 360.00
     return bearing;
 
+def wait_seconds(seconds_to_wait):
+    tstart = time.time();
+    tnow = tstart
+    while tstart + seconds_to_wait > tnow:
+        tnow = time.time()
+
 def wait_altitude(mav, alt_min, alt_max, timeout=30):
     climb_rate = 0
     previous_alt = 0
@@ -84,29 +90,31 @@ def wait_groundspeed(mav, gs_min, gs_max, timeout=30):
 def wait_roll(mav, roll, accuracy, timeout=30):
     '''wait for a given roll in degrees'''
     tstart = time.time()
-    print("Waiting for roll of %u" % roll)
+    print("Waiting for roll of %d at %s" % (roll, time.ctime()))
     while time.time() < tstart + timeout:
         m = mav.recv_match(type='ATTITUDE', blocking=True)
+        p = math.degrees(m.pitch)
         r = math.degrees(m.roll)
-        print("Roll %u" % r)
+        print("Roll %d Pitch %d" % (r, p))
         if math.fabs(r - roll) <= accuracy:
-            print("Attained roll %u" % roll)
+            print("Attained roll %d" % roll)
             return True
-    print("Failed to attain roll %u" % roll)
+    print("Failed to attain roll %d" % roll)
     return False
 
 def wait_pitch(mav, pitch, accuracy, timeout=30):
     '''wait for a given pitch in degrees'''
     tstart = time.time()
-    print("Waiting for pitch of %u" % pitch)
+    print("Waiting for pitch of %u at %s" % (pitch, time.ctime()))
     while time.time() < tstart + timeout:
         m = mav.recv_match(type='ATTITUDE', blocking=True)
-        r = math.degrees(m.pitch)
-        print("Pitch %u" % r)
-        if math.fabs(r - pitch) <= accuracy:
-            print("Attained pitch %u" % pitch)
+        p = math.degrees(m.pitch)
+        r = math.degrees(m.roll)
+        print("Pitch %d Roll %d" % (p, r))
+        if math.fabs(p - pitch) <= accuracy:
+            print("Attained pitch %d" % pitch)
             return True
-    print("Failed to attain pitch %u" % pitch)
+    print("Failed to attain pitch %d" % pitch)
     return False
 
 
@@ -206,10 +214,15 @@ def wait_waypoint(mav, wpnum_start, wpnum_end, allow_skip=True, max_dist=2, time
     return False
 
 def save_wp(mavproxy, mav):
-    mavproxy.send('rc 7 2000\n')
-    mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==2000', blocking=True)
     mavproxy.send('rc 7 1000\n')
     mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==1000', blocking=True)
+    wait_seconds(1)
+    mavproxy.send('rc 7 2000\n')
+    mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==2000', blocking=True)
+    wait_seconds(1)
+    mavproxy.send('rc 7 1000\n')
+    mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==1000', blocking=True)
+    wait_seconds(1)
 
 def wait_mode(mav, mode, timeout=None):
     print("Waiting for mode %s" % mode)

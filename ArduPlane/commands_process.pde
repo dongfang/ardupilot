@@ -23,9 +23,19 @@ void change_command(uint8_t cmd_index)
         next_nav_command.id = NO_COMMAND;
         non_nav_command_ID      = NO_COMMAND;
 
-        // If appears that the nav command index is the index of the first nav command from one
-        // before the master index?
-        nav_command_index       = cmd_index - 1;
+        /*
+          if we are in AUTO then we need to set the nav_command_index
+          to one less than the requested index as
+          process_next_command() will increment the index before using
+          it. If not in AUTO then we just set the index as give.
+          Thanks to Michael Day for finding this!
+         */
+        if (control_mode == AUTO) {
+            nav_command_index       = cmd_index - 1;
+        } else {
+            nav_command_index       = cmd_index;
+        }
+
         g.command_index.set_and_save(cmd_index);
         update_commands();
     }
