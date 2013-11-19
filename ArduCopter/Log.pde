@@ -339,7 +339,7 @@ struct PACKED log_Nav_Tuning {
 // Write an Nav Tuning packet
 static void Log_Write_Nav_Tuning()
 {
-    Vector3f velocity = inertial_nav.get_velocity();
+    const Vector3f &velocity = inertial_nav.get_velocity();
 
     struct log_Nav_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_NAV_TUNING_MSG),
@@ -525,7 +525,7 @@ struct PACKED log_INAV {
 // Write an INAV packet
 static void Log_Write_INAV()
 {
-    Vector3f accel_corr = inertial_nav.accel_correction_ef;
+    const Vector3f &accel_corr = inertial_nav.accel_correction_ef;
 
     struct log_INAV pkt = {
         LOG_PACKET_HEADER_INIT(LOG_INAV_MSG),
@@ -715,6 +715,7 @@ static void Log_Write_PID(uint8_t pid_id, int32_t error, int32_t p, int32_t i, i
 struct PACKED log_Camera {
     LOG_PACKET_HEADER;
     uint32_t gps_time;
+    uint16_t gps_week;
     int32_t  latitude;
     int32_t  longitude;
     int32_t  altitude;
@@ -729,7 +730,8 @@ static void Log_Write_Camera()
 #if CAMERA == ENABLED
     struct log_Camera pkt = {
         LOG_PACKET_HEADER_INIT(LOG_CAMERA_MSG),
-        gps_time    : g_gps->time,
+        gps_time    : g_gps->time_week_ms,
+        gps_week    : g_gps->time_week,
         latitude    : current_loc.lat,
         longitude   : current_loc.lng,
         altitude    : current_loc.alt,
@@ -818,7 +820,7 @@ static const struct LogStructure log_structure[] PROGMEM = {
     { LOG_PID_MSG, sizeof(log_PID),         
       "PID",   "Biiiiif",    "Id,Error,P,I,D,Out,Gain" },
     { LOG_CAMERA_MSG, sizeof(log_Camera),                 
-      "CAM",   "ILLeccC",    "GPSTime,Lat,Lng,Alt,Roll,Pitch,Yaw" },
+      "CAM",   "IHLLeccC",   "GPSTime,GPSWeek,Lat,Lng,Alt,Roll,Pitch,Yaw" },
     { LOG_ERROR_MSG, sizeof(log_Error),         
       "ERR",   "BB",         "Subsys,ECode" },
 };
@@ -830,7 +832,7 @@ static void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page)
     cliSerial->printf_P(PSTR((AIRFRAME_NAME)));
  #endif
 
-    cliSerial->printf_P(PSTR("\n" THISFIRMWARE
+    cliSerial->printf_P(PSTR("\n" FIRMWARE_STRING
                              "\nFree RAM: %u\n"),
                         (unsigned) memcheck_available_memory());
 
@@ -849,6 +851,7 @@ static void start_logging()
     if (g.log_bitmask != 0 && !ap.logging_started) {
         ap.logging_started = true;
         DataFlash.StartNewLog(sizeof(log_structure)/sizeof(log_structure[0]), log_structure);
+        DataFlash.Log_Write_Message_P(PSTR(FIRMWARE_STRING));
     }
 }
 

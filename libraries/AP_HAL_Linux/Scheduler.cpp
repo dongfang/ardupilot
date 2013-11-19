@@ -213,8 +213,11 @@ void LinuxScheduler::_run_timers(bool called_from_timer_thread)
 void *LinuxScheduler::_timer_thread(void)
 {
     _setup_realtime(32768);
+    while (system_initializing()) {
+        poll(NULL, 0, 1);        
+    }
     while (true) {
-        _microsleep(1000);
+        _microsleep(5000);
 
         // run registered timers
         _run_timers(true);
@@ -245,8 +248,11 @@ void LinuxScheduler::_run_io(void)
 void *LinuxScheduler::_uart_thread(void)
 {
     _setup_realtime(32768);
+    while (system_initializing()) {
+        poll(NULL, 0, 1);        
+    }
     while (true) {
-        _microsleep(1000);
+        _microsleep(10000);
 
         // process any pending serial bytes
         ((LinuxUARTDriver *)hal.uartA)->_timer_tick();
@@ -259,8 +265,11 @@ void *LinuxScheduler::_uart_thread(void)
 void *LinuxScheduler::_io_thread(void)
 {
     _setup_realtime(32768);
+    while (system_initializing()) {
+        poll(NULL, 0, 1);        
+    }
     while (true) {
-        _microsleep(1000);
+        _microsleep(20000);
 
         // process any pending storage writes
         ((LinuxStorage *)hal.storage)->_timer_tick();

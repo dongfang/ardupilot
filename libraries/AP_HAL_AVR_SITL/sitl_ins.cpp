@@ -111,6 +111,12 @@ void SITL_State::_update_ins(float roll, 	float pitch, 	float yaw,		// Relative 
 	yAccel += accel_noise * _rand_float();
 	zAccel += accel_noise * _rand_float();
 
+        if (fabs(_sitl->accel_fail) > 1.0e-6) {
+            xAccel = _sitl->accel_fail;
+            yAccel = _sitl->accel_fail;
+            zAccel = _sitl->accel_fail;
+        }
+
 	p += gyro_noise * _rand_float();
 	q += gyro_noise * _rand_float();
 	r += gyro_noise * _rand_float();
@@ -122,7 +128,7 @@ void SITL_State::_update_ins(float roll, 	float pitch, 	float yaw,		// Relative 
 	_ins->set_gyro(Vector3f(p, q, r) + _ins->get_gyro_offsets());
 	_ins->set_accel(Vector3f(xAccel, yAccel, zAccel) + _ins->get_accel_offsets());
 
-	airspeed_pin_value = _airspeed_sensor(airspeed);
+	airspeed_pin_value = _airspeed_sensor(airspeed + (_sitl->aspd_noise * _rand_float()));
 }
 
 #endif

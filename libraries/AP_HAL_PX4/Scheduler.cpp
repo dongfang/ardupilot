@@ -14,6 +14,7 @@
 #include <drivers/drv_hrt.h>
 #include <nuttx/arch.h>
 #include <systemlib/systemlib.h>
+#include <pthread.h>
 #include <poll.h>
 
 #include "UARTDriver.h"
@@ -37,6 +38,8 @@ PX4Scheduler::PX4Scheduler() :
 void PX4Scheduler::init(void *unused) 
 {
     _sketch_start_time = hrt_absolute_time();
+
+    _main_task_pid = getpid();
 
     // setup the timer thread - this will call tasks at 1kHz
 	pthread_attr_t thread_attr;
@@ -82,13 +85,26 @@ uint32_t PX4Scheduler::millis()
     return hrt_absolute_time() / 1000;
 }
 
+/**
+   delay for a specified number of microseconds using a semaphore wait
+ */
+void PX4Scheduler::delay_microseconds_semaphore(uint16_t usec) 
+{
+    sem_t wait_semaphore;
+    struct hrt_call wait_call;
+    sem_init(&wait_semaphore, 0, 0);
+    hrt_call_after(&wait_call, usec, (hrt_callout)sem_post, &wait_semaphore);
+    sem_wait(&wait_semaphore);
+}
+
 void PX4Scheduler::delay_microseconds(uint16_t usec) 
 {
-    if (_in_timer_proc) {
-        ::printf("ERROR: delay_microseconds() from timer process\n");
+    perf_begin(_perf_delay);
+    if (usec >= 500) {
+        delay_microseconds_semaphore(usec);
+        perf_end(_perf_delay);
         return;
     }
-    perf_begin(_perf_delay);
 	uint32_t start = micros();
     uint32_t dt;
 	while ((dt=(micros() - start)) < usec) {
@@ -99,7 +115,7 @@ void PX4Scheduler::delay_microseconds(uint16_t usec)
 
 void PX4Scheduler::delay(uint16_t ms)
 {
-    if (_in_timer_proc) {
+    if (in_timerprocess()) {
         ::printf("ERROR: delay() from timer process\n");
         return;
     }
@@ -108,8 +124,7 @@ void PX4Scheduler::delay(uint16_t ms)
     
     while ((hrt_absolute_time() - start)/1000 < ms && 
            !_px4_thread_should_exit) {
-        // this yields the CPU to other apps
-        poll(NULL, 0, 1);
+        delay_microseconds_semaphore(1000);
         if (_min_delay_cb_ms <= ms) {
             if (_delay_cb) {
                 _delay_cb();
@@ -216,8 +231,11 @@ void PX4Scheduler::_run_timers(bool called_from_timer_thread)
 
 void *PX4Scheduler::_timer_thread(void)
 {
+    while (!_hal_initialized) {
+        poll(NULL, 0, 1);        
+    }
     while (!_px4_thread_should_exit) {
-        poll(NULL, 0, 1);
+        delay_microseconds_semaphore(1000);
 
         // run registered timers
         perf_begin(_perf_timers);
@@ -254,8 +272,11 @@ void PX4Scheduler::_run_io(void)
 
 void *PX4Scheduler::_uart_thread(void)
 {
+    while (!_hal_initialized) {
+        poll(NULL, 0, 1);        
+    }
     while (!_px4_thread_should_exit) {
-        poll(NULL, 0, 1);
+        delay_microseconds_semaphore(1000);
 
         // process any pending serial bytes
         ((PX4UARTDriver *)hal.uartA)->_timer_tick();
@@ -267,6 +288,9 @@ void *PX4Scheduler::_uart_thread(void)
 
 void *PX4Scheduler::_io_thread(void)
 {
+    while (!_hal_initialized) {
+        poll(NULL, 0, 1);        
+    }
     while (!_px4_thread_should_exit) {
         poll(NULL, 0, 1);
 
@@ -290,8 +314,9 @@ void PX4Scheduler::panic(const prog_char_t *errormsg)
     exit(1);
 }
 
-bool PX4Scheduler::in_timerprocess() {
-    return _in_timer_proc;
+bool PX4Scheduler::in_timerprocess() 
+{
+    return getpid() != _main_task_pid;
 }
 
 bool PX4Scheduler::system_initializing() {

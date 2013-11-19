@@ -63,7 +63,7 @@ static void run_cli(AP_HAL::UARTDriver *port)
         motors.armed(false);
         motors.output();
     }
-    
+
     while (1) {
         main_menu.run();
     }
@@ -92,7 +92,7 @@ static void init_ardupilot()
     hal.uartA->begin(SERIAL0_BAUD, 256, 256);
 #else
     // use a bit less for non-HIL operation
-    hal.uartA->begin(SERIAL0_BAUD, 128, 128);
+    hal.uartA->begin(SERIAL0_BAUD, 512, 128);
 #endif
 
     // GPS serial port.
@@ -103,16 +103,24 @@ static void init_ardupilot()
     hal.uartB->begin(38400, 256, 16);
 #endif
 
-    cliSerial->printf_P(PSTR("\n\nInit " THISFIRMWARE
+    cliSerial->printf_P(PSTR("\n\nInit " FIRMWARE_STRING
                          "\n\nFree RAM: %u\n"),
                     memcheck_available_memory());
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM2
+    /*
+      run the timer a bit slower on APM2 to reduce the interrupt load
+      on the CPU
+     */
+    hal.scheduler->set_timer_speed(500);
+#endif
 
     //
     // Report firmware version code expect on console (check of actual EEPROM format version is done in load_parameters function)
     //
     report_version();
 
-    relay.init(); 
+    relay.init();
 
 #if COPTER_LEDS == ENABLED
     copter_leds_init();
@@ -134,14 +142,14 @@ static void init_ardupilot()
     hal.scheduler->register_delay_callback(mavlink_delay_cb, 5);
 
     // we start by assuming USB connected, as we initialed the serial
-    // port with SERIAL0_BAUD. check_usb_mux() fixes this if need be.    
+    // port with SERIAL0_BAUD. check_usb_mux() fixes this if need be.
     ap.usb_connected = true;
     check_usb_mux();
 
     //#if CONFIG_HAL_BOARD != HAL_BOARD_APM2
     // we have a 2nd serial port for telemetry on all boards except
     // APM2. We actually do have one on APM2 but it isn't necessary as
-    // a MUX is used 
+    // a MUX is used
     hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
     gcs3.init(hal.uartC);
     //#endif
@@ -260,7 +268,7 @@ static void init_ardupilot()
     reset_control_switch();
     init_aux_switches();
 
-    startup_ground();
+    startup_ground(false);
 
 #if LOGGING_ENABLED == ENABLED
     Log_Write_Startup();
@@ -273,7 +281,7 @@ static void init_ardupilot()
 //******************************************************************************
 //This function does all the calibrations, etc. that we need during a ground start
 //******************************************************************************
-static void startup_ground(void)
+static void startup_ground(bool force_gyro_cal)
 {
     gcs_send_text_P(SEVERITY_LOW,PSTR("GROUND START"));
 
@@ -282,7 +290,7 @@ static void startup_ground(void)
 
     // Warm up and read Gyro offsets
     // -----------------------------
-    ins.init(AP_InertialSensor::COLD_START,
+    ins.init(force_gyro_cal?AP_InertialSensor::COLD_START:AP_InertialSensor::WARM_START,
              ins_sample_rate);
  #if CLI_ENABLED == ENABLED
     report_ins();
@@ -310,14 +318,14 @@ static bool mode_requires_GPS(uint8_t mode) {
     switch(mode) {
         case AUTO:
         case GUIDED:
-        case LOITER: 
+        case LOITER:
         case RTL:
         case CIRCLE:
         case POSITION:
             return true;
         default:
             return false;
-    }   
+    }
 
     return false;
 }
@@ -327,8 +335,7 @@ static bool manual_flight_mode(uint8_t mode) {
     switch(mode) {
         case ACRO:
         case STABILIZE:
-        case TOY_A:
-        case TOY_M:
+        case TOY:
         case SPORT:
             return true;
         default:
@@ -346,6 +353,11 @@ static bool set_mode(uint8_t mode)
     // boolean to record if flight mode could be set
     bool success = false;
     bool ignore_checks = !motors.armed();   // allow switching to any mode if disarmed.  We rely on the arming check to perform
+
+    // return immediately if we are already in the desired mode
+    if (mode == control_mode) {
+        return true;
+    }
 
     switch(mode) {
         case ACRO:
@@ -443,21 +455,7 @@ static bool set_mode(uint8_t mode)
             }
             break;
 
-        // THOR
-        // These are the flight modes for Toy mode
-        // See the defines for the enumerated values
-        case TOY_A:
-            success = true;
-            set_yaw_mode(YAW_TOY);
-            set_roll_pitch_mode(ROLL_PITCH_TOY);
-            set_throttle_mode(THROTTLE_AUTO);
-            set_nav_mode(NAV_NONE);
-
-            // save throttle for fast exit of Alt hold
-            saved_toy_throttle = g.rc_3.control_in;
-            break;
-
-        case TOY_M:
+        case TOY:
             success = true;
             set_yaw_mode(YAW_TOY);
             set_roll_pitch_mode(ROLL_PITCH_TOY);
@@ -609,11 +607,8 @@ print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode)
     case OF_LOITER:
         port->print_P(PSTR("OF_LOITER"));
         break;
-    case TOY_M:
-        port->print_P(PSTR("TOY_M"));
-        break;
-    case TOY_A:
-        port->print_P(PSTR("TOY_A"));
+    case TOY:
+        port->print_P(PSTR("TOY"));
         break;
     case SPORT:
         port->print_P(PSTR("SPORT"));
