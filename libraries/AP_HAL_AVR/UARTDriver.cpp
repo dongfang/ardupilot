@@ -56,6 +56,7 @@ AVRUARTDriver::AVRUARTDriver(
 }
 /* UARTDriver method implementations */
 
+// Space: 0 means keep-previous. If calling the first time with 0s: ??
 void AVRUARTDriver::begin(uint32_t baud, uint16_t rxSpace, uint16_t txSpace) {
 	uint16_t ubrr;
 	bool use_u2x = true;
@@ -155,19 +156,6 @@ int16_t AVRUARTDriver::read(void) {
 	// pull character from tail
 	c = _rxBuffer->bytes[_rxBuffer->tail];
 	_rxBuffer->tail = (_rxBuffer->tail + 1) & _rxBuffer->mask;
-
-	return (c);
-}
-
-int16_t AVRUARTDriver::peek(void) {
-	uint8_t c;
-
-	// if the head and tail are equal, the buffer is empty
-	if (!_open || (_rxBuffer->head == _rxBuffer->tail))
-		return (-1);
-
-	// pull character from tail
-	c = _rxBuffer->bytes[_rxBuffer->tail];
 
 	return (c);
 }

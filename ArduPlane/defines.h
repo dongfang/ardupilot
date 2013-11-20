@@ -199,6 +199,18 @@ enum log_messages {
 // Climb rate calculations
 #define ALTITUDE_HISTORY_LENGTH 8       //Number of (time,altitude) points to
                                         // regress a climb rate from
+// Dongfang addition: If an APM is on a very good supply, then this scaling to internal reference
+// that was added to the code degrades ADC performance. By defining ANALOG_RATIOMETRIC, the
+// battery volts and current measurement will not use the internal reference but trust that the
+// supply is 5.0 volts (and the Schottky diode in series with the supply is either accounted for
+// or removed).
+#ifdef ANALOG_RATIOMETRIC
+#define BATTERY_VOLTAGE(x) (x->voltage_average_ratiometric()*g.volt_div_ratio)
+#define CURRENT_AMPS(x) (x->voltage_average_ratiometric()-g.curr_amp_offset)*g.curr_amp_per_volt
+#else
+#define BATTERY_VOLTAGE(x) (x->voltage_average()*g.volt_div_ratio)
+#define CURRENT_AMPS(x) (x->voltage_average()-g.curr_amp_offset)*g.curr_amp_per_volt
+#endif
 
 #define AN4                     4
 #define AN5                     5

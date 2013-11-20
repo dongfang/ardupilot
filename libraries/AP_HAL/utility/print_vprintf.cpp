@@ -193,6 +193,7 @@ void print_vprintf (AP_HAL::Print *s, unsigned char in_progmem, const char *fmt,
                                 vtype = prec;
                                 ndigs = 0;
                         }
+
                         memset(buf, 0, sizeof(buf));
                         exp = ftoa_engine(value, (char *)buf, vtype, ndigs);
                         vtype = buf[0];

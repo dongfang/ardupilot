@@ -169,6 +169,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 /*
  Function returns an equivalent elevator deflection in centi-degrees in the range from -4500 to 4500
  A positive demand is up
+ Seems only to be used from ACRO mode.
  Inputs are: 
  1) demanded pitch rate in degrees/second
  2) control gain scaler = scaling_speed / aspeed
@@ -189,7 +190,7 @@ int32_t AP_PitchController::get_rate_out(float desired_rate, float scaler)
 /*
   get the rate offset in degrees/second needed for pitch in body frame
   to maintain height in a coordinated turn.
-
+  Inputs: Bank angle and airspeed.
   Also returns the inverted flag and the estimated airspeed in m/s for
   use by the rest of the pitch controller
  */

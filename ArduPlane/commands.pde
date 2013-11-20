@@ -22,8 +22,8 @@ static void update_auto()
         }
     } else {
         if(g.command_index != 0) {
-            g.command_index = nav_command_index;
-            nav_command_index--;
+            g.command_index = nav_command_index;						// Update persistent command index
+            nav_command_index--;						// ????
         }
         nav_command_ID  = NO_COMMAND;
         non_nav_command_ID      = NO_COMMAND;
@@ -78,7 +78,8 @@ static struct Location get_cmd_with_index(int16_t i)
 
     temp = get_cmd_with_index_raw(i);
 
-    // Add on home altitude if we are a nav command (or other command with altitude) and stored alt is relative
+    // Add on home altitude if we are a nav command (or other command with altitude) 
+    // and stored alt is relative
     if ((temp.id < MAV_CMD_NAV_LAST || temp.id == MAV_CMD_CONDITION_CHANGE_ALT) &&
         (temp.options & MASK_OPTIONS_RELATIVE_ALT) &&
         (temp.lat != 0 || temp.lng != 0 || temp.alt != 0)) {
@@ -209,7 +210,9 @@ static void init_home()
 {
     gcs_send_text_P(SEVERITY_LOW, PSTR("init home"));
 
-    // block until we get a good fix
+    // First make sure we have some kind of fix. This will always be the case when called
+    // from update_GPS in ArduPlane, but do_set_home in commands_logic MAY be fired before
+    // there is a GPS fix.
     // -----------------------------
     while (!g_gps->new_data || !g_gps->fix) {
         g_gps->update();

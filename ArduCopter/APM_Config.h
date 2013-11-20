@@ -15,6 +15,7 @@
  *  OCTA_FRAME
  *  OCTA_QUAD_FRAME
  *  HELI_FRAME
+ *  SINGLE_FRAME
  */
 
 #define MOBILE 2

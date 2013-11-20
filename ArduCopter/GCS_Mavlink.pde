@@ -105,6 +105,8 @@ static NOINLINE void send_heartbeat(mavlink_channel_t chan)
         MAV_TYPE_OCTOROTOR,
 #elif (FRAME_CONFIG == HELI_FRAME)
         MAV_TYPE_HELICOPTER,
+#elif (FRAME_CONFIG == SINGLE_FRAME)  //because mavlink did not define a singlecopter, we use a rocket
+        MAV_TYPE_ROCKET,
 #else
   #error Unrecognised frame type
 #endif
@@ -853,7 +855,7 @@ GCS_MAVLINK::GCS_MAVLINK() :
 }
 
 void
-GCS_MAVLINK::init(AP_HAL::BetterStream* port)
+GCS_MAVLINK::init(AP_HAL::UARTDriver* port)
 {
     GCS_Class::init(port);
     if (port == hal.uartA) {
@@ -2205,10 +2207,6 @@ static void gcs_data_stream_send(void)
  */
 static void gcs_check_input(void)
 {
-#if SERIAL3_MODE == MOBILE
-	mobile.task();
-#endif
-
     gcs0.update();
     if (gcs3.initialised) {
         gcs3.update();
