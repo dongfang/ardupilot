@@ -659,14 +659,12 @@ void MobileDriver::begin(BetterStream* mobile, int16_t rxSpace, int16_t txSpace)
 	beginState(_savedState = initialState());
 }
 
-/* WHERE is the implementation for this?
- * size_t MobileDriver::write(const uint8_t *buffer, size_t size) {
+size_t MobileDriver::write(const uint8_t *buffer, size_t size) {
 	size_t result = 0;
 	while(result < size &&_txBuffer.write(buffer[result]))
 		result++;
 	return result;
 }
-*/
 
 /*
  * Begin message and end message events may be invoked from GCS_MAVLink!

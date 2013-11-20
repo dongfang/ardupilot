@@ -81,7 +81,6 @@
 
 // Use this to enable telemetry on UART3 (APM1) or UART2 (APM2).
 // This is now independent of whether you have a mux or not.
-#define MOBILE 2
 #ifndef SERIAL3_MODE
  # define SERIAL3_MODE MOBILE
 #endif
