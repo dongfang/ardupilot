@@ -127,7 +127,8 @@ void ADCSource::set_settle_time(uint16_t settle_time_ms)
     _settle_time_ms = settle_time_ms;
 }
 
-/* read_average is called from the normal thread (not an interrupt).
+/* 
+ * read_average is called from the normal thread (not an interrupt).
  * It side effects to deleting the history.
  */
 float ADCSource::_read_average() {

@@ -878,7 +878,7 @@ GCS_MAVLINK::GCS_MAVLINK() :
 }
 
 void
-GCS_MAVLINK::init(AP_HAL::UARTDriver *port)
+GCS_MAVLINK::init(AP_HAL::BetterStream *port)
 {
     GCS_Class::init(port);
     if (port == (AP_HAL::BetterStream*)hal.uartA) {

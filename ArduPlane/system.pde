@@ -49,7 +49,7 @@ static int8_t reboot_board(uint8_t argc, const Menu::arg *argv)
 }
 
 // the user wants the CLI. It never exits
-static void run_cli(AP_HAL::UARTDriver *port)
+static void run_cli(AP_HAL::BetterStream *port)
 {
     // disable the failsafe code in the CLI
     hal.scheduler->register_timer_failsafe(NULL,1);
@@ -59,7 +59,8 @@ static void run_cli(AP_HAL::UARTDriver *port)
 
     cliSerial = port;
     Menu::set_port(port);
-    port->set_blocking_writes(true);
+    // TODO: We need to deal with this:
+    ((AP_HAL::UARTDriver*)port)->set_blocking_writes(true);
 
     while (1) {
         main_menu.run();
@@ -122,7 +123,7 @@ static void init_ardupilot()
     // which serial ports should be inited, and added the SERIAL3_MODE define to decide
     // what kind of telemetry HW should be expected at the 2nd UART:
     // SERIAL3_MODE==DISABLED (0): Disabled.
-    // SERIAL3_MODE==ENALBED  (1): Raw MAVLink for a XBee or similar.
+    // SERIAL3_MODE==ENABLED  (1): Raw MAVLink for a XBee or similar.
     // SERIAL3_MODE==MOBILE   (2): DroneCell data-via-commands
 
 #if SERIAL3_MODE == ENABLED || SERIAL3_MODE == MOBILE
@@ -234,9 +235,9 @@ static void startup_ground(void)
     // Makes the servos wiggle
     // step 1 = 1 wiggle
     // -----------------------
-    // if (!g.skip_gyro_cal) {
-    //    demo_servos(1);
-    // }
+    if (!g.skip_gyro_cal) {
+        demo_servos(1);
+    }
 
     //INS ground start
     //------------------------
@@ -257,9 +258,9 @@ static void startup_ground(void)
 
     // Makes the servos wiggle - 3 times signals ready to fly
     // -----------------------
-    // if (!g.skip_gyro_cal) {
-    //    demo_servos(3);
-    // }
+    if (!g.skip_gyro_cal) {
+		demo_servos(3);
+    }
 
     // reset last heartbeat time, so we don't trigger failsafe on slow
     // startup
@@ -527,8 +528,6 @@ static void check_usb_mux(void)
 
 /*
  * Read Vcc vs 1.1v internal reference
- * With some +-1 noise reading that, the resulting voltage (in millivolts) will have noise:
- * +-1*5.5/1.1 = +-4.4mV
  */
 uint16_t board_voltage(void)
 {

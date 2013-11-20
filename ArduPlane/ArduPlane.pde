@@ -62,6 +62,8 @@
 #include <SITL.h>
 #include <AP_Scheduler.h>       // main loop scheduler
 
+#include <MobileDriver.h>
+
 #include <AP_Navigation.h>
 #include <AP_L1_Control.h>
 #include <AP_RCMapper.h>        // RC input mapping library
@@ -292,6 +294,10 @@ static bool guided_throttle_passthru;
 static GCS_MAVLINK gcs0;
 static GCS_MAVLINK gcs3;
 
+#if SERIAL3_MODE == MOBILE
+SIM900Driver mobile;
+#endif
+
 // selected navigation controller
 static AP_Navigation *nav_controller = &L1_controller;
 
@@ -350,7 +356,7 @@ uint8_t oldSwitchPosition;
 // This is used to enable the inverted flight feature
 bool inverted_flight     = false;
 
-// These values are in us-space and not in centidegree-space...
+// These values are in us-space and not in centidegree-space.
 static struct {
     // These are trim values used for elevon control
     // For elevons radio_in[CH_ROLL] and radio_in[CH_PITCH] are

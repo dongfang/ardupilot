@@ -90,34 +90,21 @@ public:
     // includes offset from PWM
     //int16_t   get_radio_out(void);
 
-<<<<<<< HEAD
-    int16_t                                         pwm_to_angle_dz(uint16_t dead_zone);
-    int16_t                                         pwm_to_angle();
-    float                                           norm_input();
-    float                                           norm_output();
-    int16_t                                         angle_to_pwm();
-    int16_t                                         pwm_to_range();
-    int16_t                                         pwm_to_range_dz(uint16_t dead_zone);
-    int16_t                                         range_to_pwm();
-
-    void                                            output() const;
-    void                                            output_trim() const;
-    uint16_t                                        read() const;
-    void                                            input();
-    void                                            enable_out();
-=======
     int16_t pwm_to_angle_dz(uint16_t dead_zone);
     int16_t pwm_to_angle();
     float norm_input();
     float norm_output();
     int16_t angle_to_pwm();
 
+    int16_t                                         pwm_to_range();
+    int16_t                                         pwm_to_range_dz(uint16_t dead_zone);
+    int16_t                                         range_to_pwm();
+
     void output() const;
     void output_trim() const;
     uint16_t read() const;
     void input();
     void enable_out();
->>>>>>> master
 
     static const struct AP_Param::GroupInfo         var_info[];
 
