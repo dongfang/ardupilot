@@ -527,12 +527,21 @@
  # define OBC_FAILSAFE DISABLED
 #endif
 
-#ifndef SERIAL_BUFSIZE
- # define SERIAL_BUFSIZE 256
+// 128 bytes should be enough for incoming, as buffers are emptied at 100Hz
+// 256 is necessary for output, as GCS_MAVLink waits till it can send a full
+// message in one go, and the max message size is about 256.
+#ifndef SERIAL_BUFSIZE_IN
+ # define SERIAL_BUFSIZE_IN 128
+#endif
+#ifndef SERIAL_BUFSIZE_OUT
+ # define SERIAL_BUFSIZE_OUT 256
 #endif
 
-#ifndef SERIAL2_BUFSIZE
- # define SERIAL2_BUFSIZE 256
+// Buf size between MobileDriver and SERIAL3 port
+// Since the modem is checked till buffers empty 100 times/s and there is a max
+// of 5760 chars/sec, 64 should be enough. Need to verify that.
+#ifndef MOBILE_BUFSIZE
+ # define MOBILE_BUFSIZE 64
 #endif
 
 /*

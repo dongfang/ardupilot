@@ -76,7 +76,7 @@ static void init_ardupilot()
     // The console port buffers are defined to be sufficiently large to support
     // the MAVLink protocol efficiently
     //
-    hal.uartA->begin(SERIAL0_BAUD, 128, SERIAL_BUFSIZE);
+    hal.uartA->begin(SERIAL0_BAUD, SERIAL_BUFSIZE_IN, SERIAL_BUFSIZE_OUT);
 
     // GPS serial port.
     //
@@ -126,15 +126,15 @@ static void init_ardupilot()
     // SERIAL3_MODE==ENABLED  (1): Raw MAVLink for a XBee or similar.
     // SERIAL3_MODE==MOBILE   (2): DroneCell data-via-commands
 
-#if SERIAL3_MODE == ENABLED || SERIAL3_MODE == MOBILE
-// we have a 2nd serial port for telemetry
-    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, SERIAL_BUFSIZE);
 #if SERIAL3_MODE == ENABLED
+// we have a 2nd serial port for telemetry
+    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), SERIAL_BUFSIZE_IN, SERIAL_BUFSIZE_OUT);
     gcs3.init(hal.uartC);
 #elif SERIAL3_MODE == MOBILE
- 	mobile.begin(hal.uartC, 128, SERIAL_BUFSIZE);
+    // with 5760 bytes/s and 100 iterations/s we need 58 bytes of buffer.
+    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), MOBILE_BUFSIZE, MOBILE_BUFSIZE);
+ 	mobile.begin(hal.uartC, SERIAL_BUFSIZE_IN, SERIAL_BUFSIZE_OUT);
 	gcs3.init(&mobile);
-#endif
 #endif
 
     mavlink_system.sysid = g.sysid_this_mav;

@@ -2334,4 +2334,3 @@ static void gcs_retry_deferred(void)
 {
     gcs_send_message(MSG_RETRY_DEFERRED);
 }
-
