@@ -174,59 +174,14 @@
 // LED and IO Pins
 //
 #if CONFIG_HAL_BOARD == HAL_BOARD_APM1
- # define LED_ON           HIGH
- # define LED_OFF          LOW
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
- # define LED_ON           LOW
- # define LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
- # define LED_ON           LOW
- # define LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
- # define LED_ON           LOW
- # define LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD == HAL_BOARD_FLYMAPLE
- # define LED_ON           LOW
- # define LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
  # define LED_ON           LOW
  # define LED_OFF          HIGH
 #endif
-
-////////////////////////////////////////////////////////////////////////////////
-// CopterLEDs
-//
-
-#ifndef COPTER_LEDS
- #define COPTER_LEDS ENABLED
-#endif
-
-#define COPTER_LED_ON           HIGH
-#define COPTER_LED_OFF          LOW
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2
- #define COPTER_LED_1 AN4       // Motor or Aux LED
- #define COPTER_LED_2 AN5       // Motor LED or Beeper
- #define COPTER_LED_3 AN6       // Motor or GPS LED
- #define COPTER_LED_4 AN7       // Motor LED
- #define COPTER_LED_5 AN8       // Motor LED
- #define COPTER_LED_6 AN9       // Motor LED
- #define COPTER_LED_7 AN10      // Motor LED
- #define COPTER_LED_8 AN11      // Motor LED
-#elif CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL || CONFIG_HAL_BOARD == HAL_BOARD_PX4
- #define COPTER_LED_1 AN8       // Motor or Aux LED
- #define COPTER_LED_2 AN9       // Motor LED
- #define COPTER_LED_3 AN10      // Motor or GPS LED
- #define COPTER_LED_4 AN11      // Motor LED
- #define COPTER_LED_5 AN12      // Motor LED
- #define COPTER_LED_6 AN13      // Motor LED
- #define COPTER_LED_7 AN14      // Motor LED
- #define COPTER_LED_8 AN15      // Motor LED
-#else
- // not supported yet on this board
- #undef COPTER_LEDS
-#endif
-
 
 //////////////////////////////////////////////////////////////////////////////
 // Barometer
@@ -277,7 +232,7 @@
 #endif
 
 #ifndef SONAR_GAIN_DEFAULT
- # define SONAR_GAIN_DEFAULT 2.0            // gain for controlling how quickly sonar range adjusts target altitude (lower means slower reaction)
+ # define SONAR_GAIN_DEFAULT 0.8            // gain for controlling how quickly sonar range adjusts target altitude (lower means slower reaction)
 #endif
 
 #ifndef THR_SURFACE_TRACKING_VELZ_MAX
@@ -332,8 +287,11 @@
 #ifndef SERIAL0_BAUD
  # define SERIAL0_BAUD                   115200
 #endif
-#ifndef SERIAL3_BAUD
- # define SERIAL3_BAUD                    57600
+#ifndef SERIAL1_BAUD
+ # define SERIAL1_BAUD                    57600
+#endif
+#ifndef SERIAL2_BAUD
+ # define SERIAL2_BAUD                    57600
 #endif
 
 
@@ -990,6 +948,9 @@
 #ifndef LOG_NTUN
  # define LOG_NTUN                      ENABLED
 #endif
+#ifndef LOG_RCIN
+ # define LOG_RCIN                      ENABLED
+#endif
 #ifndef LOG_IMU
  # define LOG_IMU                       DISABLED
 #endif
@@ -1001,8 +962,8 @@
  # define LOG_CURRENT                   ENABLED
 #endif
 // quad motor PWMs
-#ifndef LOG_MOTORS
- # define LOG_MOTORS                    DISABLED
+#ifndef LOG_RCOUT
+ # define LOG_RCOUT                     DISABLED
 #endif
 // optical flow
 #ifndef LOG_OPTFLOW
@@ -1031,10 +992,11 @@
     LOGBIT(PM)              | \
     LOGBIT(CTUN)            | \
     LOGBIT(NTUN)            | \
+    LOGBIT(RCIN)            | \
     LOGBIT(IMU)             | \
     LOGBIT(CMD)             | \
     LOGBIT(CURRENT)         | \
-    LOGBIT(MOTORS)          | \
+    LOGBIT(RCOUT)           | \
     LOGBIT(OPTFLOW)         | \
     LOGBIT(PID)             | \
     LOGBIT(COMPASS)         | \

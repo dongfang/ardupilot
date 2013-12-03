@@ -58,6 +58,7 @@ struct sockaddr_in SITL_State::_rcout_addr;
 pid_t SITL_State::_parent_pid;
 uint32_t SITL_State::_update_count;
 bool SITL_State::_motors_on;
+uint16_t SITL_State::sonar_pin_value;
 uint16_t SITL_State::airspeed_pin_value;
 uint16_t SITL_State::voltage_pin_value;
 uint16_t SITL_State::current_pin_value;
@@ -178,7 +179,7 @@ void SITL_State::_sitl_setup(void)
     if (_sitl != NULL) {
         // setup some initial values
         _update_barometer(_initial_height);
-        _update_ins(0, 0, 0, 0, 0, 0, 0, 0, -9.8, 0);
+        _update_ins(0, 0, 0, 0, 0, 0, 0, 0, -9.8, 0, _initial_height);
         _update_compass(0, 0, 0);
         _update_gps(0, 0, 0, 0, 0, 0, false);
     }
@@ -294,7 +295,7 @@ void SITL_State::_timer_handler(int signum)
         _update_ins(_sitl->state.rollDeg, _sitl->state.pitchDeg, _sitl->state.yawDeg,
                     _sitl->state.rollRate, _sitl->state.pitchRate, _sitl->state.yawRate,
                     _sitl->state.xAccel, _sitl->state.yAccel, _sitl->state.zAccel,
-                    _sitl->state.airspeed);
+                    _sitl->state.airspeed, _sitl->state.altitude);
         _update_barometer(_sitl->state.altitude);
         _update_compass(_sitl->state.rollDeg, _sitl->state.pitchDeg, _sitl->state.yawDeg);
     }

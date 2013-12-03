@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduRover v2.43"
+#define THISFIRMWARE "ArduRover v2.44beta1"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -270,8 +270,8 @@ SITL sitl;
 // GCS selection
 ////////////////////////////////////////////////////////////////////////////////
 //
-GCS_MAVLINK	gcs0;
-GCS_MAVLINK	gcs3;
+static const uint8_t num_gcs = MAVLINK_COMM_NUM_BUFFERS;
+static GCS_MAVLINK gcs[MAVLINK_COMM_NUM_BUFFERS];
 
 // a pin for reading the receiver RSSI voltage. The scaling by 0.25 
 // is to take the 0 to 1024 range down to an 8 bit range for MAVLink
@@ -356,7 +356,7 @@ static struct {
     uint8_t triggered;
 } failsafe;
 
-// notify object
+// notification object for LEDs, buzzers etc (parameter set to false disables external leds)
 static AP_Notify notify;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -592,7 +592,7 @@ void setup() {
     AP_Notify::flags.pre_arm_check = true;
     AP_Notify::flags.failsafe_battery = false;
 
-    notify.init();
+    notify.init(false);
 
     battery.init();
 
@@ -869,7 +869,7 @@ static void update_current_mode(void)
         // and throttle gives speed in proportion to cruise speed, up
         // to 50% throttle, then uses nudging above that.
         float target_speed = channel_throttle->pwm_to_angle() * 0.01 * 2 * g.speed_cruise;
-        in_reverse = (target_speed < 0);
+        set_reverse(target_speed < 0);
         if (in_reverse) {
             target_speed = constrain_float(target_speed, -g.speed_cruise, 0);
         } else {
@@ -892,7 +892,7 @@ static void update_current_mode(void)
 
         // mark us as in_reverse when using a negative throttle to
         // stop AHRS getting off
-        in_reverse = (channel_throttle->servo_out < 0);
+        set_reverse(channel_throttle->servo_out < 0);
         break;
 
     case HOLD:

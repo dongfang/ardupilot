@@ -132,7 +132,7 @@ static RC_Channel *channel_pitch;
 static RC_Channel *channel_throttle;
 static RC_Channel *channel_rudder;
 
-// notification object for LEDs, buzzers etc
+// notification object for LEDs, buzzers etc (parameter set to false disables external leds)
 static AP_Notify notify;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -289,8 +289,8 @@ static bool guided_throttle_passthru;
 ////////////////////////////////////////////////////////////////////////////////
 // GCS selection
 ////////////////////////////////////////////////////////////////////////////////
-static GCS_MAVLINK gcs0;
-static GCS_MAVLINK gcs3;
+static const uint8_t num_gcs = MAVLINK_COMM_NUM_BUFFERS;
+static GCS_MAVLINK gcs[MAVLINK_COMM_NUM_BUFFERS];
 
 // selected navigation controller
 static AP_Navigation *nav_controller = &L1_controller;
@@ -306,6 +306,11 @@ static AP_SpdHgtControl *SpdHgt_Controller = &TECS_controller;
 static AP_HAL::AnalogSource *rssi_analog_source;
 
 static AP_HAL::AnalogSource *vcc_pin;
+
+////////////////////////////////////////////////////////////////////////////////
+// Sonar
+////////////////////////////////////////////////////////////////////////////////
+static AP_RangeFinder_analog sonar;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Relay
@@ -729,6 +734,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { compass_accumulate,     1,   1500 },
     { barometer_accumulate,   1,    900 },
     { update_notify,          1,    300 },
+    { read_sonars,            1,    500 },
     { one_second_loop,       50,   3900 },
     { check_long_failsafe,   15,   1000 },
     { airspeed_ratio_update, 50,   1000 },
@@ -754,7 +760,7 @@ void setup() {
     AP_Notify::flags.pre_arm_check = true;
     AP_Notify::flags.failsafe_battery = false;
 
-    notify.init();
+    notify.init(false);
 
     battery.init();
 
@@ -902,7 +908,11 @@ static void update_logging(void)
     
     if (g.log_bitmask & MASK_LOG_NTUN)
         Log_Write_Nav_Tuning();
+
+    if (g.log_bitmask & MASK_LOG_RC)
+        Log_Write_RC();
 }
+
 
 /*
   check for OBC failsafe check

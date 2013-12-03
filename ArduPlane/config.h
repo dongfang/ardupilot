@@ -168,8 +168,11 @@
 #ifndef SERIAL0_BAUD
  # define SERIAL0_BAUD                   115200
 #endif
-#ifndef SERIAL3_BAUD
- # define SERIAL3_BAUD                    57600
+#ifndef SERIAL1_BAUD
+ # define SERIAL1_BAUD                    57600
+#endif
+#ifndef SERIAL2_BAUD
+ # define SERIAL2_BAUD                    57600
 #endif
 
 
@@ -455,7 +458,8 @@
     MASK_LOG_COMPASS | \
     MASK_LOG_CURRENT | \
     MASK_LOG_TECS | \
-    MASK_LOG_CAMERA
+    MASK_LOG_CAMERA | \
+    MASK_LOG_RC
 
 
 
@@ -527,6 +531,10 @@
 
 #ifndef SERIAL_BUFSIZE
  # define SERIAL_BUFSIZE 512
+#endif
+
+#ifndef SERIAL1_BUFSIZE
+ # define SERIAL1_BUFSIZE 256
 #endif
 
 #ifndef SERIAL2_BUFSIZE

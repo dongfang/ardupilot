@@ -51,6 +51,8 @@ print_log_menu(void)
         PLOG(COMPASS);
         PLOG(TECS);
         PLOG(CAMERA);
+        PLOG(RC);
+        PLOG(SONAR);
  #undef PLOG
     }
 
@@ -142,6 +144,8 @@ select_logs(uint8_t argc, const Menu::arg *argv)
         TARG(COMPASS);
         TARG(TECS);
         TARG(CAMERA);
+        TARG(RC);
+        TARG(SONAR);
  #undef TARG
     }
 
@@ -387,6 +391,31 @@ static void Log_Write_Mode(uint8_t mode)
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
 
+struct PACKED log_Sonar {
+    LOG_PACKET_HEADER;
+    uint32_t timestamp;
+    float distance;
+    float voltage;
+    float baro_alt;
+    float groundspeed;
+    uint8_t throttle;
+};
+
+// Write a sonar packet
+static void Log_Write_Sonar()
+{
+    struct log_Sonar pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_SONAR_MSG),
+        timestamp   : hal.scheduler->millis(),
+        distance    : sonar.distance_cm(),
+        voltage     : sonar.voltage(),
+        baro_alt    : barometer.get_altitude(),
+        groundspeed : (0.01f * g_gps->ground_speed_cm),
+        throttle    : (uint8_t)(100 * channel_throttle->norm_output())
+    };
+    DataFlash.WriteBlock(&pkt, sizeof(pkt));
+}
+
 struct PACKED log_Current {
     LOG_PACKET_HEADER;
     uint32_t time_ms;
@@ -450,6 +479,12 @@ static void Log_Write_IMU()
     DataFlash.Log_Write_IMU(ins);
 }
 
+static void Log_Write_RC(void)
+{
+    DataFlash.Log_Write_RCIN();
+    DataFlash.Log_Write_RCOUT();
+}
+
 static const struct LogStructure log_structure[] PROGMEM = {
     LOG_COMMON_STRUCTURES,
     { LOG_ATTITUDE_MSG, sizeof(log_Attitude),       
@@ -466,6 +501,8 @@ static const struct LogStructure log_structure[] PROGMEM = {
       "CTUN", "Icccchhf",    "TimeMS,NavRoll,Roll,NavPitch,Pitch,ThrOut,RdrOut,AccY" },
     { LOG_NTUN_MSG, sizeof(log_Nav_Tuning),         
       "NTUN", "ICICCccfI",   "TimeMS,Yaw,WpDist,TargBrg,NavBrg,AltErr,Arspd,Alt,GSpdCM" },
+    { LOG_SONAR_MSG, sizeof(log_Sonar),             
+      "SONR", "IffffB",   "TimeMS,DistCM,Volt,BaroAlt,GSpd,Thr" },
     { LOG_MODE_MSG, sizeof(log_Mode),             
       "MODE", "IMB",         "TimeMS,Mode,ModeNum" },
     { LOG_CURRENT_MSG, sizeof(log_Current),             
@@ -496,6 +533,12 @@ static void start_logging()
 {
     DataFlash.StartNewLog(sizeof(log_structure)/sizeof(log_structure[0]), log_structure);
     DataFlash.Log_Write_Message_P(PSTR(FIRMWARE_STRING));
+
+    // write system identifier as well if available
+    char sysid[40];
+    if (hal.util->get_system_id(sysid)) {
+        DataFlash.Log_Write_Message(sysid);
+    }
 }
 
 #else // LOGGING_ENABLED
@@ -514,6 +557,7 @@ static void Log_Write_Mode(uint8_t mode) {}
 static void Log_Write_Compass() {}
 static void Log_Write_GPS() {}
 static void Log_Write_IMU() {}
+static void Log_Write_RC() {}
 
 static int8_t process_logs(uint8_t argc, const Menu::arg *argv) {
     return 0;
