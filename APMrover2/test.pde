@@ -10,7 +10,6 @@ static int8_t	test_passthru(uint8_t argc, 	const Menu::arg *argv);
 static int8_t	test_failsafe(uint8_t argc, 	const Menu::arg *argv);
 static int8_t	test_gps(uint8_t argc, 			const Menu::arg *argv);
 static int8_t	test_ins(uint8_t argc, 			const Menu::arg *argv);
-static int8_t	test_battery(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_relay(uint8_t argc,	 	const Menu::arg *argv);
 static int8_t	test_wp(uint8_t argc, 			const Menu::arg *argv);
 static int8_t	test_sonar(uint8_t argc, 	const Menu::arg *argv);
@@ -30,7 +29,6 @@ static const struct Menu::command test_menu_commands[] PROGMEM = {
 	{"radio",			test_radio},
 	{"passthru",		test_passthru},
 	{"failsafe",		test_failsafe},
-	{"battery",	test_battery},
 	{"relay",			test_relay},
 	{"waypoints",		test_wp},
 	{"modeswitch",		test_modeswitch},
@@ -140,9 +138,7 @@ test_radio(uint8_t argc, const Menu::arg *argv)
 		// ------------------------------
 		set_servos();
 
-        tuning_value = constrain_float(((float)(g.rc_7.radio_in - g.rc_7.radio_min) / (float)(g.rc_7.radio_max - g.rc_7.radio_min)),0,1);
-                
-		cliSerial->printf_P(PSTR("IN 1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d  Tuning = %2.3f\n"),
+		cliSerial->printf_P(PSTR("IN 1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d\n"),
 							channel_steer->control_in,
 							g.rc_2.control_in,
 							channel_throttle->control_in,
@@ -150,8 +146,7 @@ test_radio(uint8_t argc, const Menu::arg *argv)
 							g.rc_5.control_in,
 							g.rc_6.control_in,
 							g.rc_7.control_in,
-							g.rc_8.control_in,
-                                                        tuning_value);
+							g.rc_8.control_in);
 
 		if(cliSerial->available() > 0){
 			return (0);
@@ -215,43 +210,6 @@ test_failsafe(uint8_t argc, const Menu::arg *argv)
 }
 
 static int8_t
-test_battery(uint8_t argc, const Menu::arg *argv)
-{
-if (g.battery_monitoring == 3 || g.battery_monitoring == 4) {
-	print_hit_enter();
-
-	while(1){
-		delay(100);
-		read_radio();
-		read_battery();
-		if (g.battery_monitoring == 3){
-			cliSerial->printf_P(PSTR("V: %4.4f\n"),
-						battery_voltage1,
-						current_amps1,
-						current_total1);
-		} else {
-			cliSerial->printf_P(PSTR("V: %4.4f, A: %4.4f, mAh: %4.4f\n"),
-						battery_voltage1,
-						current_amps1,
-						current_total1);
-		}
-
-		// write out the servo PWM values
-		// ------------------------------
-		set_servos();
-
-		if(cliSerial->available() > 0){
-			return (0);
-		}
-	}
-} else {
-	cliSerial->printf_P(PSTR("Not enabled\n"));
-	return (0);
-}
-
-}
-
-static int8_t
 test_relay(uint8_t argc, const Menu::arg *argv)
 {
 	print_hit_enter();
@@ -311,7 +269,7 @@ test_modeswitch(uint8_t argc, const Menu::arg *argv)
 
 	cliSerial->printf_P(PSTR("Control CH "));
 
-	cliSerial->println(MODE_CHANNEL, DEC);
+	cliSerial->println(MODE_CHANNEL, BASE_DEC);
 
 	while(1){
 		delay(20);
@@ -350,17 +308,13 @@ test_gps(uint8_t argc, const Menu::arg *argv)
 	while(1){
 		delay(100);
 
-		// Blink GPS LED if we don't have a fix
-		// ------------------------------------
-		update_GPS_light();
-
 		g_gps->update();
 
 		if (g_gps->new_data){
 			cliSerial->printf_P(PSTR("Lat: %ld, Lon %ld, Alt: %ldm, #sats: %d\n"),
 					g_gps->latitude,
 					g_gps->longitude,
-					g_gps->altitude/100,
+					g_gps->altitude_cm/100,
 					g_gps->num_sats);
 		}else{
 			cliSerial->printf_P(PSTR("."));
@@ -378,8 +332,7 @@ test_ins(uint8_t argc, const Menu::arg *argv)
 	ahrs.init();
     ahrs.set_fly_forward(true);
 	ins.init(AP_InertialSensor::COLD_START, 
-             ins_sample_rate, 
-             flash_leds);
+             ins_sample_rate);
     ahrs.reset();
 
 	print_hit_enter();
@@ -388,39 +341,32 @@ test_ins(uint8_t argc, const Menu::arg *argv)
     uint8_t medium_loopCounter = 0;
 
 	while(1){
-		delay(20);
-		if (millis() - fast_loopTimer > 19) {
-			delta_ms_fast_loop 	= millis() - fast_loopTimer;
-			G_Dt 				= (float)delta_ms_fast_loop / 1000.f;		// used by DCM integrator
-			fast_loopTimer		= millis();
+        ins.wait_for_sample(1000);
 
-			// INS
-			// ---
-			ahrs.update();
+        ahrs.update();
 
-			if(g.compass_enabled) {
-				medium_loopCounter++;
-				if(medium_loopCounter >= 5){
-					compass.read();
-                    medium_loopCounter = 0;
-				}
-			}
-
-			// We are using the IMU
-			// ---------------------
-            Vector3f gyros 	= ins.get_gyro();
-            Vector3f accels = ins.get_accel();
-			cliSerial->printf_P(PSTR("r:%4d  p:%4d  y:%3d  g=(%5.1f %5.1f %5.1f)  a=(%5.1f %5.1f %5.1f)\n"),
+        if(g.compass_enabled) {
+            medium_loopCounter++;
+            if(medium_loopCounter >= 5){
+                compass.read();
+                medium_loopCounter = 0;
+            }
+        }
+        
+        // We are using the IMU
+        // ---------------------
+        Vector3f gyros 	= ins.get_gyro();
+        Vector3f accels = ins.get_accel();
+        cliSerial->printf_P(PSTR("r:%4d  p:%4d  y:%3d  g=(%5.1f %5.1f %5.1f)  a=(%5.1f %5.1f %5.1f)\n"),
                             (int)ahrs.roll_sensor / 100,
                             (int)ahrs.pitch_sensor / 100,
                             (uint16_t)ahrs.yaw_sensor / 100,
                             gyros.x, gyros.y, gyros.z,
                             accels.x, accels.y, accels.z);
-		}
-		if(cliSerial->available() > 0){
-			return (0);
-		}
-	}
+    }
+    if(cliSerial->available() > 0){
+        return (0);
+    }
 }
 
 
@@ -444,8 +390,7 @@ test_mag(uint8_t argc, const Menu::arg *argv)
 
     // we need the AHRS initialised for this test
 	ins.init(AP_InertialSensor::COLD_START, 
-             ins_sample_rate, 
-             flash_leds);
+             ins_sample_rate);
     ahrs.reset();
 
 	int counter = 0;
@@ -456,32 +401,25 @@ test_mag(uint8_t argc, const Menu::arg *argv)
     uint8_t medium_loopCounter = 0;
 
     while(1) {
-		delay(20);
-		if (millis() - fast_loopTimer > 19) {
-			delta_ms_fast_loop 	= millis() - fast_loopTimer;
-			G_Dt 				= (float)delta_ms_fast_loop / 1000.f;		// used by DCM integrator
-			fast_loopTimer		= millis();
+        ins.wait_for_sample(1000);
+        ahrs.update();
 
-			// IMU
-			// ---
-			ahrs.update();
-
-            medium_loopCounter++;
-            if(medium_loopCounter >= 5){
-                if (compass.read()) {
-                    // Calculate heading
-                    Matrix3f m = ahrs.get_dcm_matrix();
-                    heading = compass.calculate_heading(m);
-                    compass.null_offsets();
-                }
-                medium_loopCounter = 0;
+        medium_loopCounter++;
+        if(medium_loopCounter >= 5){
+            if (compass.read()) {
+                // Calculate heading
+                Matrix3f m = ahrs.get_dcm_matrix();
+                heading = compass.calculate_heading(m);
+                compass.null_offsets();
             }
-
-			counter++;
-			if (counter>20) {
-                if (compass.healthy) {
-                    Vector3f maggy = compass.get_offsets();
-                    cliSerial->printf_P(PSTR("Heading: %ld, XYZ: %d, %d, %d,\tXYZoff: %6.2f, %6.2f, %6.2f\n"),
+            medium_loopCounter = 0;
+        }
+        
+        counter++;
+        if (counter>20) {
+            if (compass.healthy) {
+                Vector3f maggy = compass.get_offsets();
+                cliSerial->printf_P(PSTR("Heading: %ld, XYZ: %d, %d, %d,\tXYZoff: %6.2f, %6.2f, %6.2f\n"),
                                     (wrap_360_cd(ToDeg(heading) * 100)) /100,
                                     (int)compass.mag_x,
                                     (int)compass.mag_y,
@@ -489,12 +427,11 @@ test_mag(uint8_t argc, const Menu::arg *argv)
                                     maggy.x,
                                     maggy.y,
                                     maggy.z);
-                } else {
-                    cliSerial->println_P(PSTR("compass not healthy"));
-                }
-                counter=0;
+            } else {
+                cliSerial->println_P(PSTR("compass not healthy"));
             }
-		}
+            counter=0;
+        }
         if (cliSerial->available() > 0) {
             break;
         }

@@ -3,12 +3,19 @@
  *  logic for dealing with the current command in the mission and home location
  */
 
+/*
+ * Called from
+ * change_command
+ * reload_commands_airstart
+ */
 static void init_commands()
 {
+	// The persistent command index.
     g.command_index.set_and_save(0);
     nav_command_ID  = NO_COMMAND;
     non_nav_command_ID      = NO_COMMAND;
     next_nav_command.id     = CMD_BLANK;
+    // The transient command index.
     nav_command_index = 0;
 }
 
@@ -22,21 +29,14 @@ static void update_auto()
         }
     } else {
         if(g.command_index != 0) {
-            g.command_index = nav_command_index;
-            nav_command_index--;
+            g.command_index = nav_command_index;						// Update persistent command index
+            nav_command_index--;						// ????
         }
         nav_command_ID  = NO_COMMAND;
         non_nav_command_ID      = NO_COMMAND;
         next_nav_command.id     = CMD_BLANK;
         process_next_command();
     }
-}
-
-// this is only used by an air-start
-static void reload_commands_airstart()
-{
-    init_commands();
-    decrement_cmd_index();
 }
 
 /*
@@ -85,7 +85,8 @@ static struct Location get_cmd_with_index(int16_t i)
 
     temp = get_cmd_with_index_raw(i);
 
-    // Add on home altitude if we are a nav command (or other command with altitude) and stored alt is relative
+    // Add on home altitude if we are a nav command (or other command with altitude) 
+    // and stored alt is relative
     if ((temp.id < MAV_CMD_NAV_LAST || temp.id == MAV_CMD_CONDITION_CHANGE_ALT) &&
         (temp.options & MASK_OPTIONS_RELATIVE_ALT) &&
         (temp.lat != 0 || temp.lng != 0 || temp.alt != 0)) {
@@ -127,13 +128,6 @@ static void set_cmd_with_index(struct Location temp, int16_t i)
     hal.storage->write_dword(mem, temp.lng);
 }
 
-static void decrement_cmd_index()
-{
-    if (g.command_index > 0) {
-        g.command_index.set_and_save(g.command_index - 1);
-    }
-}
-
 static int32_t read_alt_to_hold()
 {
     if (g.RTL_altitude_cm < 0) {
@@ -142,10 +136,16 @@ static int32_t read_alt_to_hold()
     return g.RTL_altitude_cm + home.alt;
 }
 
-
 /*
- *  This function stores waypoint commands
- *  It looks to see what the next command type is and finds the last command.
+ * This function stores waypoint commands
+ * It looks to see what the next command type is and finds the last command.
+ * Called from  
+ * do_takeoff
+ * do_nav_wp
+ * do_land
+ * do_loiter_unlimited
+ * do_loiter_turns
+ * do_loiter_time
  */
 static void set_next_WP(const struct Location *wp)
 {
@@ -169,7 +169,6 @@ static void set_next_WP(const struct Location *wp)
         }
     }
 
-
     // are we already past the waypoint? This happens when we jump
     // waypoints, and it can cause us to skip a waypoint. If we are
     // past the waypoint when we start on a leg, then use the current
@@ -184,21 +183,12 @@ static void set_next_WP(const struct Location *wp)
     // -----------------------------------------------
     target_altitude_cm = current_loc.alt;
 
-    if (prev_WP.id != MAV_CMD_NAV_TAKEOFF && 
-        prev_WP.alt != home.alt && 
-        (next_WP.id == MAV_CMD_NAV_WAYPOINT || next_WP.id == MAV_CMD_NAV_LAND)) {
-        offset_altitude_cm = next_WP.alt - prev_WP.alt;
-    } else {
-        offset_altitude_cm = 0;        
-    }
-
     // zero out our loiter vals to watch for missed waypoints
     loiter_angle_reset();
 
-    // this is handy for the groundstation
-    wp_totalDistance        = get_distance(&current_loc, &next_WP);
-    wp_distance             = wp_totalDistance;
+    setup_glide_slope();
 
+	// This was done already.
     loiter_angle_reset();
 }
 
@@ -221,22 +211,21 @@ static void set_guided_WP(void)
     // used to control FBW and limit the rate of climb
     // -----------------------------------------------
     target_altitude_cm = current_loc.alt;
-    offset_altitude_cm = next_WP.alt - prev_WP.alt;
 
-    // this is handy for the groundstation
-    wp_totalDistance        = get_distance(&current_loc, &next_WP);
-    wp_distance             = wp_totalDistance;
+    setup_glide_slope();
 
     loiter_angle_reset();
 }
 
 // run this at setup on the ground
 // -------------------------------
-void init_home()
+static void init_home()
 {
     gcs_send_text_P(SEVERITY_LOW, PSTR("init home"));
 
-    // block until we get a good fix
+    // First make sure we have some kind of fix. This will always be the case when called
+    // from update_GPS in ArduPlane, but do_set_home in commands_logic MAY be fired before
+    // there is a GPS fix.
     // -----------------------------
     while (!g_gps->new_data || !g_gps->fix) {
         g_gps->update();
@@ -249,7 +238,8 @@ void init_home()
     home.id         = MAV_CMD_NAV_WAYPOINT;
     home.lng        = g_gps->longitude;                                 // Lon * 10**7
     home.lat        = g_gps->latitude;                                  // Lat * 10**7
-    home.alt        = max(g_gps->altitude, 0);
+    // This is not so good if you fly in a depression where alt < 0.
+    home.alt        = max(g_gps->altitude_cm, 0);
     home_is_set = true;
 
     gcs_send_text_fmt(PSTR("gps alt: %lu"), (unsigned long)home.alt);
@@ -265,9 +255,21 @@ void init_home()
     // Load home for a default guided_WP
     // -------------
     guided_WP = home;
+    
+    // Is this going to cause trouble if g.RTL_altitude_cm is negative? 
     guided_WP.alt += g.RTL_altitude_cm;
-
 }
 
-
+/*
+  update home location from GPS
+  this is called as long as we have 3D lock and the arming switch is
+  not pushed
+*/
+static void update_home()
+{
+    home.lng        = g_gps->longitude;                                 // Lon * 10**7
+    home.lat        = g_gps->latitude;                                  // Lat * 10**7
+    home.alt        = max(g_gps->altitude_cm, 0);
+    barometer.update_calibration();
+}
 

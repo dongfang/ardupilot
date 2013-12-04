@@ -11,9 +11,6 @@
 #include <RC_Channel.h>     // RC Channel Library
 #include "AP_Motors_Class.h"
 
-// comment out the line below to return to stability patch used in ArduCopter ver 2.8.1 ~ 2.9.1b
-#define AP_MOTORS_MATRIX_SCALING_STABILITY_PATCH
-
 #define AP_MOTORS_MATRIX_YAW_FACTOR_CW   -1
 #define AP_MOTORS_MATRIX_YAW_FACTOR_CCW   1
 
@@ -42,7 +39,7 @@ public:
     // enable - starts allowing signals to be sent to motors
     virtual void        enable();
 
-    // motor test
+    // output_test - spin each motor for a moment to allow the user to confirm the motor order and spin direction
     virtual void        output_test();
 
     // output_min - sends minimum values out to the motors

@@ -1,12 +1,22 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
  *       RC_Channel.cpp - Radio library for Arduino
  *       Code by Jason Short. DIYDrones.com
- *
- *       This library is free software; you can redistribute it and / or
- *               modify it under the terms of the GNU Lesser General Public
- *               License as published by the Free Software Foundation; either
- *               version 2.1 of the License, or (at your option) any later version.
  *
  */
 
@@ -20,17 +30,16 @@ extern const AP_HAL::HAL& hal;
 
 #include "RC_Channel.h"
 
-#define NUM_CHANNELS 8
 /// global array with pointers to all APM RC channels, will be used by AP_Mount
 /// and AP_Camera classes / It points to RC input channels, both APM1 and APM2
 /// only have 8 input channels.
-RC_Channel *RC_Channel::rc_ch[NUM_CHANNELS];
+RC_Channel *RC_Channel::rc_ch[RC_MAX_CHANNELS];
 
 const AP_Param::GroupInfo RC_Channel::var_info[] PROGMEM = {
     // @Param: MIN
     // @DisplayName: RC min PWM
     // @Description: RC minimum PWM pulse width. Typically 1000 is lower limit, 1500 is neutral and 2000 is upper limit.
-    // @Units: ms
+    // @Units: pwm
     // @Range: 800 2200
     // @Increment: 1
     // @User: Advanced
@@ -39,7 +48,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] PROGMEM = {
     // @Param: TRIM
     // @DisplayName: RC trim PWM
     // @Description: RC trim (neutral) PWM pulse width. Typically 1000 is lower limit, 1500 is neutral and 2000 is upper limit.
-    // @Units: ms
+    // @Units: pwm
     // @Range: 800 2200
     // @Increment: 1
     // @User: Advanced
@@ -48,7 +57,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] PROGMEM = {
     // @Param: MAX
     // @DisplayName: RC max PWM
     // @Description: RC maximum PWM pulse width. Typically 1000 is lower limit, 1500 is neutral and 2000 is upper limit.
-    // @Units: ms
+    // @Units: pwm
     // @Range: 800 2200
     // @Increment: 1
     // @User: Advanced
@@ -61,11 +70,19 @@ const AP_Param::GroupInfo RC_Channel::var_info[] PROGMEM = {
     // @User: Advanced
     AP_GROUPINFO("REV",  3, RC_Channel, _reverse, 1),
 
+    // Note: index 4 was used by the previous _dead_zone value. We
+    // changed it to 5 as dead zone values had previously been
+    // incorrectly saved, overriding user values. They were also
+    // incorrectly interpreted for the throttle on APM:Plane
+
     // @Param: DZ
     // @DisplayName: RC dead-zone
     // @Description: dead zone around trim.
+    // @Units: pwm
+    // @Range: 0 200
     // @User: Advanced
-    AP_GROUPINFO("DZ",   4, RC_Channel, _dead_zone, 0),
+    AP_GROUPINFO("DZ",   5, RC_Channel, _dead_zone, 0),
+
     AP_GROUPEND
 };
 
@@ -95,9 +112,11 @@ RC_Channel::set_angle(int16_t angle)
 }
 
 void
-RC_Channel::set_dead_zone(int16_t dzone)
+RC_Channel::set_default_dead_zone(int16_t dzone)
 {
-    _dead_zone.set_and_save(abs(dzone >>1));
+    if (!_dead_zone.load()) {
+        _dead_zone.set(abs(dzone));
+    }
 }
 
 void
@@ -133,9 +152,8 @@ RC_Channel::set_pwm(int16_t pwm)
 {
     radio_in = pwm;
 
-    if(_type == RC_CHANNEL_TYPE_RANGE) {
+    if (_type == RC_CHANNEL_TYPE_RANGE) {
         control_in = pwm_to_range();
-        control_in = (control_in < _dead_zone) ? 0 : control_in;
     } else {
         //RC_CHANNEL_TYPE_ANGLE, RC_CHANNEL_TYPE_ANGLE_RAW
         control_in = pwm_to_angle();
@@ -158,6 +176,12 @@ RC_Channel::set_pwm_no_deadzone(int16_t pwm)
     }
 }
 
+// Mix but with manual override possibility.
+// Assumes that _low ~= -_high
+// Mix result:
+// control_in==0 : value+control_in
+// control_in==+-high: control_in
+// Not used from anywhere at all.
 int16_t
 RC_Channel::control_mix(float value)
 {
@@ -165,13 +189,17 @@ RC_Channel::control_mix(float value)
 }
 
 // are we below a threshold?
+// Not used except in test.pde, which is probably an error.
 bool
 RC_Channel::get_failsafe(void)
 {
     return (radio_in < (radio_min - 50));
 }
 
-// returns just the PWM without the offset from radio_min
+// Convert abstract servo_out value to
+// pwm_out in the range [0, radio_max-radio_min], no reverse applied, and
+// radio_out with offset and reverse applied.
+// in the case of range: What happens to trim???
 void
 RC_Channel::calc_pwm(void)
 {
@@ -270,17 +298,16 @@ RC_Channel::angle_to_pwm()
         return _reverse * ((long)servo_out * (long)(radio_trim - radio_min)) / (long)_high;
 }
 
-/*
-  convert a pulse width modulation value to a value in the configured
-  range, using the specified deadzone
- */
+// Convert backend range value to abstract range value (applying reversal but not trim).
+// Applies dead zone only (!!!) to bottom end of range, why? Throttle?
 int16_t
 RC_Channel::pwm_to_range_dz(uint16_t dead_zone)
 {
-    int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
+    int16_t r_in = constrain_int16(radio_in, radio_min, radio_max);
 
+    // Apply radio to abstract reverse
     if (_reverse == -1) {
-	    r_in = radio_max.get() - (r_in - radio_min.get());
+	    r_in = radio_max - (r_in - radio_min);
     }
 
     int16_t radio_trim_low  = radio_min + dead_zone;
@@ -293,25 +320,25 @@ RC_Channel::pwm_to_range_dz(uint16_t dead_zone)
         return _low;
 }
 
-/*
-  convert a pulse width modulation value to a value in the configured
-  range
- */
+// Convert backend range value to abstract range value (applying reversal but not trim).
 int16_t
 RC_Channel::pwm_to_range()
 {
     return pwm_to_range_dz(_dead_zone);
 }
 
-
+// Convert servo_out value in the range [_low_out .. _high_out] to the range
+// [0..radio_max-radio_min].
+// There is no trim and no reverse applied.
 int16_t
 RC_Channel::range_to_pwm()
 {
-    return ((long)(servo_out - _low_out) * (long)(radio_max - radio_min)) / (long)(_high_out - _low_out);
+    return ((long)(servo_out - _low_out) * (long)(radio_max - radio_min)) /
+    		(long)(_high_out - _low_out);
 }
 
 // ------------------------------------------
-
+// Return input as a value in the range [-1..1]. Used for fly-by-wire.
 float
 RC_Channel::norm_input()
 {
@@ -327,15 +354,20 @@ RC_Channel::norm_output()
     int16_t mid = (radio_max + radio_min) / 2;
     float ret;
     if(radio_out < mid)
+    	// Negative value in the range [-1..0[
         ret = (float)(radio_out - mid) / (float)(mid - radio_min);
     else
+    	// Nonnegative value in the range [0..1]
         ret = (float)(radio_out - mid) / (float)(radio_max  - mid);
-    if (_reverse == -1) {
+    if (_reverse == -1) { // Shit.. reverse back to internal sign.
 	    ret = -ret;
     }
     return ret;
 }
 
+/*
+ * These 3 methods are used only used from RC_Channel_aux.
+ */
 void RC_Channel::output() const
 {
     hal.rcout->write(_ch_out, radio_out);
@@ -362,4 +394,12 @@ void
 RC_Channel::enable_out()
 {
     hal.rcout->enable_ch(_ch_out);
+}
+
+RC_Channel *RC_Channel::rc_channel(uint8_t i)
+{
+    if (i >= RC_MAX_CHANNELS) {
+        return NULL;
+    }
+    return rc_ch[i];
 }

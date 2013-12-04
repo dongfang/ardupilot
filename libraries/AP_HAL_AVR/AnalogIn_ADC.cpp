@@ -24,8 +24,10 @@ ADCSource::ADCSource(uint8_t pin) :
 
 float ADCSource::read_average() {
     if (_pin == ANALOG_INPUT_BOARD_VCC) {
+    	// Special case: Board voltage reading. Our "pin" is the 1.1 V reference.
+    	// The board voltage is: ADCVAL = 1.2 * 1024 / V --> V = 1.1 * 1024 / ADCVAL = 1126.4
         uint16_t v = (uint16_t) _read_average();
-        return 1126400UL / v;
+        return 1126400UL / v;	// Apparently we're doing millivolts.
     } else {
         return _read_average();
     }
@@ -36,8 +38,10 @@ float ADCSource::read_latest() {
     cli();
     uint16_t latest = _latest;
     SREG = sreg;
+	// Special case: Board voltage reading. Our "pin" is the 1.1 V reference.
+	// The board voltage is: ADCVAL = 1.2 * 1024 / V --> V = 1.1 * 1024 / ADCVAL = 1126.4
     if (_pin == ANALOG_INPUT_BOARD_VCC) {
-        return 1126400UL / latest;
+        return 1126400UL / latest;	// Apparently we're doing millivolts.
     } else {
         return latest;
     }
@@ -50,6 +54,26 @@ float ADCSource::voltage_average(void)
 {
     float vcc_mV = hal.analogin->channel(ANALOG_INPUT_BOARD_VCC)->read_average();
     float v = read_average();
+    // constrain Vcc reading so that a bad Vcc doesn't throw off
+    // the reading of other sources too badly
+    if (vcc_mV < 4000) {
+        vcc_mV = 4000;
+    } else if (vcc_mV > 6000) {
+        vcc_mV = 6000;
+    }
+    return v * vcc_mV * 9.765625e-7; // 9.765625e-7 = 1.0/(1024*1000)
+}
+
+/*
+  return voltage from 0.0 to 5.0V, scaled to Vcc
+ */
+float ADCSource::voltage_latest(void)
+{
+    if (_pin == ANALOG_INPUT_BOARD_VCC) {
+        return read_latest() * 0.001f;
+    }
+    float vcc_mV = hal.analogin->channel(ANALOG_INPUT_BOARD_VCC)->read_average();
+    float v = read_latest();
     // constrain Vcc reading so that a bad Vcc doesn't throw off
     // the reading of other sources too badly
     if (vcc_mV < 4000) {
@@ -103,7 +127,9 @@ void ADCSource::set_settle_time(uint16_t settle_time_ms)
     _settle_time_ms = settle_time_ms;
 }
 
-/* read_average is called from the normal thread (not an interrupt). */
+/* read_average is called from the normal thread (not an interrupt).
+ * It side effects to deleting the history.
+ */
 float ADCSource::_read_average() {
     uint16_t sum;
     uint8_t sum_count;
@@ -140,6 +166,7 @@ void ADCSource::setup_read() {
         _read_start_time_ms = hal.scheduler->millis();
     }
     if (_pin == ANALOG_INPUT_BOARD_VCC) {
+    	// Set up to read the reference.
         ADCSRB = (ADCSRB & ~(1 << MUX5));
         ADMUX = _BV(REFS0)|_BV(MUX4)|_BV(MUX3)|_BV(MUX2)|_BV(MUX1);
     } else if (_pin == ANALOG_INPUT_NONE) {
@@ -167,8 +194,10 @@ bool ADCSource::reading_settled()
 }
 
 /* new_sample is called from an interrupt. It always has access to
- *  _sum and _sum_count. Lock out the interrupts briefly with
- * cli/sei to read these variables from outside an interrupt. */
+ * _sum and _sum_count. Lock out the interrupts briefly with
+ * cli/sei to read these variables from outside an interrupt.
+ * Sample units is raw ADC value.
+ */
 void ADCSource::new_sample(uint16_t sample) {
     _sum += sample;
     _latest = sample;
