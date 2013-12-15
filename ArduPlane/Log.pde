@@ -426,6 +426,13 @@ struct PACKED log_Current {
     float   current_total;
 };
 
+struct PACKED log_Arm_Disarm {
+    LOG_PACKET_HEADER;
+    uint32_t time_ms;
+    uint8_t  arm_state;
+    uint16_t arm_checks;
+};
+
 static void Log_Write_Current()
 {
     struct log_Current pkt = {
@@ -440,6 +447,15 @@ static void Log_Write_Current()
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
 
+static void Log_Arm_Disarm() {
+    struct log_Arm_Disarm pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_ARM_DISARM_MSG),
+        time_ms                 : hal.scheduler->millis(),
+        arm_state               : arming.is_armed(),
+        arm_checks              : arming.get_enabled_checks()      
+    };
+    DataFlash.WriteBlock(&pkt, sizeof(pkt));
+}
 
 struct PACKED log_Compass {
     LOG_PACKET_HEADER;
@@ -455,18 +471,36 @@ struct PACKED log_Compass {
 // Write a Compass packet. Total length : 15 bytes
 static void Log_Write_Compass()
 {
-    Vector3f mag_offsets = compass.get_offsets();
+    const Vector3f &mag_offsets = compass.get_offsets();
+    const Vector3f &mag = compass.get_field();
     struct log_Compass pkt = {
         LOG_PACKET_HEADER_INIT(LOG_COMPASS_MSG),
         time_ms         : hal.scheduler->millis(),
-        mag_x           : compass.mag_x,
-        mag_y           : compass.mag_y,
-        mag_z           : compass.mag_z,
+        mag_x           : (int16_t)mag.x,
+        mag_y           : (int16_t)mag.y,
+        mag_z           : (int16_t)mag.z,
         offset_x        : (int16_t)mag_offsets.x,
         offset_y        : (int16_t)mag_offsets.y,
         offset_z        : (int16_t)mag_offsets.z
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
+#if COMPASS_MAX_INSTANCES > 1
+    if (compass.get_count() > 1) {
+        const Vector3f &mag2_offsets = compass.get_offsets(1);
+        const Vector3f &mag2 = compass.get_field(1);
+        struct log_Compass pkt2 = {
+            LOG_PACKET_HEADER_INIT(LOG_COMPASS2_MSG),
+            time_ms         : hal.scheduler->millis(),
+            mag_x           : (int16_t)mag2.x,
+            mag_y           : (int16_t)mag2.y,
+            mag_z           : (int16_t)mag2.z,
+            offset_x        : (int16_t)mag2_offsets.x,
+            offset_y        : (int16_t)mag2_offsets.y,
+            offset_z        : (int16_t)mag2_offsets.z
+        };
+        DataFlash.WriteBlock(&pkt2, sizeof(pkt2));
+    }
+#endif
 }
 
 static void Log_Write_GPS(void)
@@ -509,6 +543,10 @@ static const struct LogStructure log_structure[] PROGMEM = {
       "CURR", "IhhhHf",      "TimeMS,Thr,Volt,Curr,Vcc,CurrTot" },
     { LOG_COMPASS_MSG, sizeof(log_Compass),             
       "MAG", "Ihhhhhh",   "TimeMS,MagX,MagY,MagZ,OfsX,OfsY,OfsZ" },
+    { LOG_COMPASS2_MSG, sizeof(log_Compass),             
+      "MAG2", "Ihhhhhh",   "TimeMS,MagX,MagY,MagZ,OfsX,OfsY,OfsZ" },
+    { LOG_ARM_DISARM_MSG, sizeof(log_Arm_Disarm),
+      "ARM", "IHB", "TimeMS,ArmState,ArmChecks" },
     TECS_LOG_FORMAT(LOG_TECS_MSG),
 };
 

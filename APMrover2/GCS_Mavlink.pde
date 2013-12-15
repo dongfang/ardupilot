@@ -155,7 +155,7 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t pack
 
     // default to all healthy except compass and gps which we set individually
     control_sensors_health = control_sensors_present & (~MAV_SYS_STATUS_SENSOR_3D_MAG & ~MAV_SYS_STATUS_SENSOR_GPS);
-    if (g.compass_enabled && compass.healthy && ahrs.use_compass()) {
+    if (g.compass_enabled && compass.healthy() && ahrs.use_compass()) {
         control_sensors_health |= MAV_SYS_STATUS_SENSOR_3D_MAG;
     }
     if (g_gps != NULL && g_gps->status() > GPS::NO_GPS) {
@@ -345,8 +345,9 @@ static void NOINLINE send_vfr_hud(mavlink_channel_t chan)
 
 static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
 {
-    Vector3f accel = ins.get_accel();
-    Vector3f gyro = ins.get_gyro();
+    const Vector3f &accel = ins.get_accel();
+    const Vector3f &gyro = ins.get_gyro();
+    const Vector3f &mag = compass.get_field();
 
     mavlink_msg_raw_imu_send(
         chan,
@@ -357,16 +358,37 @@ static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
         gyro.x * 1000.0,
         gyro.y * 1000.0,
         gyro.z * 1000.0,
-        compass.mag_x,
-        compass.mag_y,
-        compass.mag_z);
+        mag.x,
+        mag.y,
+        mag.z);
+
+    if (ins.get_gyro_count() <= 1 &&
+        ins.get_accel_count() <= 1 &&
+        compass.get_count() <= 1) {
+        return;
+    }
+    const Vector3f &accel2 = ins.get_accel(1);
+    const Vector3f &gyro2 = ins.get_gyro(1);
+    const Vector3f &mag2 = compass.get_field(1);
+    mavlink_msg_scaled_imu2_send(
+        chan,
+        millis(),
+        accel2.x * 1000.0f / GRAVITY_MSS,
+        accel2.y * 1000.0f / GRAVITY_MSS,
+        accel2.z * 1000.0f / GRAVITY_MSS,
+        gyro2.x * 1000.0f,
+        gyro2.y * 1000.0f,
+        gyro2.z * 1000.0f,
+        mag2.x,
+        mag2.y,
+        mag2.z);        
 }
 
 static void NOINLINE send_raw_imu3(mavlink_channel_t chan)
 {
-    Vector3f mag_offsets = compass.get_offsets();
-    Vector3f accel_offsets = ins.get_accel_offsets();
-    Vector3f gyro_offsets = ins.get_gyro_offsets();
+    const Vector3f &mag_offsets = compass.get_offsets();
+    const Vector3f &accel_offsets = ins.get_accel_offsets();
+    const Vector3f &gyro_offsets = ins.get_gyro_offsets();
 
     mavlink_msg_sensor_offsets_send(chan,
                                     mag_offsets.x,
@@ -384,7 +406,7 @@ static void NOINLINE send_raw_imu3(mavlink_channel_t chan)
 
 static void NOINLINE send_ahrs(mavlink_channel_t chan)
 {
-    Vector3f omega_I = ahrs.get_gyro_drift();
+    const Vector3f &omega_I = ahrs.get_gyro_drift();
     mavlink_msg_ahrs_send(
         chan,
         omega_I.x,

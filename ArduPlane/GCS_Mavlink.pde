@@ -91,7 +91,7 @@ static NOINLINE void send_heartbeat(mavlink_channel_t chan)
 #endif
 
     // we are armed if we are not initialising
-    if (control_mode != INITIALISING) {
+    if (control_mode != INITIALISING && arming.is_armed()) {
         base_mode |= MAV_MODE_FLAG_SAFETY_ARMED;
     }
 
@@ -206,7 +206,7 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t pack
     control_sensors_health = control_sensors_present & ~(MAV_SYS_STATUS_SENSOR_3D_MAG | 
                                                          MAV_SYS_STATUS_SENSOR_GPS |
                                                          MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE);
-    if (g.compass_enabled && compass.healthy && ahrs.use_compass()) {
+    if (g.compass_enabled && compass.healthy() && ahrs.use_compass()) {
         control_sensors_health |= MAV_SYS_STATUS_SENSOR_3D_MAG;
     }
     if (g_gps != NULL && g_gps->status() > GPS::NO_GPS) {
@@ -293,7 +293,7 @@ static void NOINLINE send_nav_controller_output(mavlink_channel_t chan)
 static void NOINLINE send_gps_raw(mavlink_channel_t chan)
 {
     static uint32_t last_send_time;
-    if (last_send_time != 0 && last_send_time == g_gps->last_fix_time) {
+    if (last_send_time != 0 && last_send_time == g_gps->last_fix_time && g_gps->status() >= GPS::GPS_OK_FIX_3D) {
         return;
     }
     last_send_time = g_gps->last_fix_time;
@@ -414,8 +414,9 @@ static void NOINLINE send_vfr_hud(mavlink_channel_t chan)
 
 static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
 {
-    Vector3f accel = ins.get_accel();
-    Vector3f gyro = ins.get_gyro();
+    const Vector3f &accel = ins.get_accel();
+    const Vector3f &gyro = ins.get_gyro();
+    const Vector3f &mag = compass.get_field();
 
     mavlink_msg_raw_imu_send(
         chan,
@@ -426,9 +427,30 @@ static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
         gyro.x * 1000.0,
         gyro.y * 1000.0,
         gyro.z * 1000.0,
-        compass.mag_x,
-        compass.mag_y,
-        compass.mag_z);
+        mag.x,
+        mag.y,
+        mag.z);
+
+    if (ins.get_gyro_count() <= 1 &&
+        ins.get_accel_count() <= 1 &&
+        compass.get_count() <= 1) {
+        return;
+    }
+    const Vector3f &accel2 = ins.get_accel(1);
+    const Vector3f &gyro2 = ins.get_gyro(1);
+    const Vector3f &mag2 = compass.get_field(1);
+    mavlink_msg_scaled_imu2_send(
+        chan,
+        millis(),
+        accel2.x * 1000.0f / GRAVITY_MSS,
+        accel2.y * 1000.0f / GRAVITY_MSS,
+        accel2.z * 1000.0f / GRAVITY_MSS,
+        gyro2.x * 1000.0f,
+        gyro2.y * 1000.0f,
+        gyro2.z * 1000.0f,
+        mag2.x,
+        mag2.y,
+        mag2.z);        
 }
 
 static void NOINLINE send_raw_imu2(mavlink_channel_t chan)
@@ -473,7 +495,7 @@ static void NOINLINE send_raw_imu3(mavlink_channel_t chan)
 
 static void NOINLINE send_ahrs(mavlink_channel_t chan)
 {
-    Vector3f omega_I = ahrs.get_gyro_drift();
+    const Vector3f &omega_I = ahrs.get_gyro_drift();
     mavlink_msg_ahrs_send(
         chan,
         omega_I.x,
@@ -1256,6 +1278,33 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             }
 #endif
             result = MAV_RESULT_ACCEPTED;
+            break;
+
+        case MAV_CMD_COMPONENT_ARM_DISARM:
+            if (packet.target_component == MAV_COMP_ID_SYSTEM_CONTROL) {
+                if (packet.param1 == 1.0f) {
+                    // run pre_arm_checks and arm_checks and display failures
+                    if (arming.arm(AP_Arming::MAVLINK)) {
+                        //only log if arming was successful
+                        Log_Arm_Disarm();
+                        result = MAV_RESULT_ACCEPTED;
+                    } else {
+                        result = MAV_RESULT_FAILED;
+                    }
+                } else if (packet.param1 == 0.0f)  {
+                    if (arming.disarm()) {
+                        //only log if disarming was successful
+                        Log_Arm_Disarm();
+                        result = MAV_RESULT_ACCEPTED;
+                    } else {
+                        result = MAV_RESULT_FAILED;
+                    }
+                } else {
+                    result = MAV_RESULT_UNSUPPORTED;
+                }
+            } else {
+                result = MAV_RESULT_UNSUPPORTED;
+            }
             break;
 
         case MAV_CMD_DO_SET_MODE:

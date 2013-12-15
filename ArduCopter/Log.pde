@@ -351,13 +351,14 @@ struct PACKED log_Compass {
 // Write a Compass packet
 static void Log_Write_Compass()
 {
-    Vector3f mag_offsets = compass.get_offsets();
-    Vector3f mag_motor_offsets = compass.get_motor_offsets();
+    const Vector3f &mag_offsets = compass.get_offsets(0);
+    const Vector3f &mag_motor_offsets = compass.get_motor_offsets(0);
+    const Vector3f &mag = compass.get_field(0);
     struct log_Compass pkt = {
         LOG_PACKET_HEADER_INIT(LOG_COMPASS_MSG),
-        mag_x           : compass.mag_x,
-        mag_y           : compass.mag_y,
-        mag_z           : compass.mag_z,
+        mag_x           : (int16_t)mag.x,
+        mag_y           : (int16_t)mag.y,
+        mag_z           : (int16_t)mag.z,
         offset_x        : (int16_t)mag_offsets.x,
         offset_y        : (int16_t)mag_offsets.y,
         offset_z        : (int16_t)mag_offsets.z,
@@ -366,6 +367,26 @@ static void Log_Write_Compass()
         motor_offset_z  : (int16_t)mag_motor_offsets.z
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
+#if COMPASS_MAX_INSTANCES > 1
+    if (compass.get_count() > 1) {
+        const Vector3f &mag2_offsets = compass.get_offsets(1);
+        const Vector3f &mag2_motor_offsets = compass.get_motor_offsets(1);
+        const Vector3f &mag2 = compass.get_field(1);
+        struct log_Compass pkt2 = {
+            LOG_PACKET_HEADER_INIT(LOG_COMPASS2_MSG),
+            mag_x           : (int16_t)mag2.x,
+            mag_y           : (int16_t)mag2.y,
+            mag_z           : (int16_t)mag2.z,
+            offset_x        : (int16_t)mag2_offsets.x,
+            offset_y        : (int16_t)mag2_offsets.y,
+            offset_z        : (int16_t)mag2_offsets.z,
+            motor_offset_x  : (int16_t)mag2_motor_offsets.x,
+            motor_offset_y  : (int16_t)mag2_motor_offsets.y,
+            motor_offset_z  : (int16_t)mag2_motor_offsets.z
+        };
+        DataFlash.WriteBlock(&pkt2, sizeof(pkt2));
+    }
+#endif
 }
 
 struct PACKED log_Performance {
@@ -723,6 +744,8 @@ static const struct LogStructure log_structure[] PROGMEM = {
       "CTUN", "hcefchhhh",   "ThrIn,SonAlt,BarAlt,WPAlt,DesSonAlt,AngBst,CRate,ThrOut,DCRate" },
     { LOG_COMPASS_MSG, sizeof(log_Compass),             
       "MAG", "hhhhhhhhh",    "MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ" },
+    { LOG_COMPASS2_MSG, sizeof(log_Compass),             
+      "MAG2", "hhhhhhhhh",    "MagX,MagY,MagZ,OfsX,OfsY,OfsZ,MOfsX,MOfsY,MOfsZ" },
     { LOG_PERFORMANCE_MSG, sizeof(log_Performance), 
       "PM",  "BBHHIhBHB",    "RenCnt,RenBlw,NLon,NLoop,MaxT,PMT,I2CErr,INSErr,INAVErr" },
     { LOG_CMD_MSG, sizeof(log_Cmd),                 
@@ -788,6 +811,9 @@ static void start_logging()
         if (hal.util->get_system_id(sysid)) {
             DataFlash.Log_Write_Message(sysid);
         }
+
+        // log the flight mode
+        Log_Write_Mode(control_mode);
     }
 }
 

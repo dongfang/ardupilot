@@ -73,6 +73,8 @@
 #include <AP_Notify.h>      // Notify library
 #include <AP_BattMonitor.h> // Battery monitor library
 
+#include <AP_Arming.h>
+
 // Pre-AP_HAL compatibility
 #include "compat.h"
 
@@ -689,14 +691,19 @@ static uint16_t mainLoop_count;
 #if MOUNT == ENABLED
 // current_loc uses the baro/gps soloution for altitude rather than gps only.
 // mabe one could use current_loc for lat/lon too and eliminate g_gps alltogether?
-AP_Mount camera_mount(&current_loc, g_gps, ahrs, 0);
+static AP_Mount camera_mount(&current_loc, g_gps, ahrs, 0);
 #endif
 
 #if MOUNT2 == ENABLED
 // current_loc uses the baro/gps soloution for altitude rather than gps only.
 // mabe one could use current_loc for lat/lon too and eliminate g_gps alltogether?
-AP_Mount camera_mount2(&current_loc, g_gps, ahrs, 1);
+static AP_Mount camera_mount2(&current_loc, g_gps, ahrs, 1);
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+// Arming/Disarming mangement class
+////////////////////////////////////////////////////////////////////////////////
+static AP_Arming arming(ahrs, barometer, home_is_set, gcs_send_text_P);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Top-level logic
@@ -727,19 +734,21 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { obc_fs_check,           5,   1000 },
     { gcs_update,             1,   1700 },
     { gcs_data_stream_send,   1,   3000 },
-    { update_mount,           1,   1500 },
-    { update_events,		 15,   1500 }, // 20
-    { check_usb_mux,          5,    300 },
+    { update_events,		 15,   1500 },
+    { check_usb_mux,          5,    300 }, // 20
     { read_battery,           5,   1000 },
     { compass_accumulate,     1,   1500 },
     { barometer_accumulate,   1,    900 },
     { update_notify,          1,    300 },
     { read_sonars,            1,    500 },
-    { one_second_loop,       50,   3900 },
+    { one_second_loop,       50,   1000 },
     { check_long_failsafe,   15,   1000 },
-    { airspeed_ratio_update, 50,   1000 },
-    { update_logging,         5,   1200 },
     { read_receiver_rssi,     5,   1000 },
+    { airspeed_ratio_update, 50,   1000 },
+    { update_mount,           1,   1500 }, // 30
+    { log_perf_info,        500,   1000 },
+    { compass_save,        3000,   2500 },
+    { update_logging,         5,   1200 },
 };
 
 // setup the var_info table
@@ -755,9 +764,6 @@ void setup() {
     // load the default values of variables listed in var_info[]
     AP_Param::setup_sketch_defaults();
 
-    // arduplane does not use arming nor pre-arm checks
-    AP_Notify::flags.armed = true;
-    AP_Notify::flags.pre_arm_check = true;
     AP_Notify::flags.failsafe_battery = false;
 
     notify.init(false);
@@ -968,25 +974,23 @@ static void one_second_loop()
     mavlink_system.sysid = g.sysid_this_mav;
 
     update_aux();
+}
 
-    static uint8_t counter;
-    counter++;
-
-    if (counter % 10 == 0) {
-        if (scheduler.debug() != 0) {
-            hal.console->printf_P(PSTR("G_Dt_max=%lu\n"), (unsigned long)G_Dt_max);
-        }
-        if (g.log_bitmask & MASK_LOG_PM)
-            Log_Write_Performance();
-        G_Dt_max = 0;
-        resetPerfData();
+static void log_perf_info()
+{
+    if (scheduler.debug() != 0) {
+        hal.console->printf_P(PSTR("G_Dt_max=%lu\n"), (unsigned long)G_Dt_max);
     }
+    if (g.log_bitmask & MASK_LOG_PM)
+        Log_Write_Performance();
+    G_Dt_max = 0;
+    resetPerfData();
+}
 
-    if (counter >= 60) {                                               
-        if(g.compass_enabled) {
-            compass.save_offsets();
-        }
-        counter = 0;
+static void compass_save()
+{
+    if (g.compass_enabled) {
+        compass.save_offsets();
     }
 }
 
@@ -1073,7 +1077,8 @@ static void update_GPS(void)
         }
 #endif        
 
-        if (hal.util->safety_switch_state() == AP_HAL::Util::SAFETY_DISARMED) {
+        if (!arming.is_armed() ||
+            hal.util->safety_switch_state() == AP_HAL::Util::SAFETY_DISARMED) {
             update_home();
         }
     }

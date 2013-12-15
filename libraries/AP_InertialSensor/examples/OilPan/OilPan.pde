@@ -174,7 +174,7 @@ void run_test()
     while( !hal.console->available() ) {
 
         // wait until we have a sample
-        while (ins.sample_available() == false) /* noop */ ;
+        ins.wait_for_sample(1000);
 
         // read samples from ins
         ins.update();

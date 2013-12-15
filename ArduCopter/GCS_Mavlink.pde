@@ -182,7 +182,7 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t pack
 
     // default to all healthy except compass, gps and receiver which we set individually
     control_sensors_health = control_sensors_present & (~MAV_SYS_STATUS_SENSOR_3D_MAG & ~MAV_SYS_STATUS_SENSOR_GPS & ~MAV_SYS_STATUS_SENSOR_RC_RECEIVER);
-    if (g.compass_enabled && compass.healthy && ahrs.use_compass()) {
+    if (g.compass_enabled && compass.healthy() && ahrs.use_compass()) {
         control_sensors_health |= MAV_SYS_STATUS_SENSOR_3D_MAG;
     }
     if (g_gps != NULL && g_gps->status() > GPS::NO_GPS && !gps_glitch.glitching()) {
@@ -268,7 +268,7 @@ static void NOINLINE send_nav_controller_output(mavlink_channel_t chan)
 
 static void NOINLINE send_ahrs(mavlink_channel_t chan)
 {
-    Vector3f omega_I = ahrs.get_gyro_drift();
+    const Vector3f &omega_I = ahrs.get_gyro_drift();
     mavlink_msg_ahrs_send(
         chan,
         omega_I.x,
@@ -450,8 +450,9 @@ static void NOINLINE send_vfr_hud(mavlink_channel_t chan)
 
 static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
 {
-    Vector3f accel = ins.get_accel();
-    Vector3f gyro = ins.get_gyro();
+    const Vector3f &accel = ins.get_accel();
+    const Vector3f &gyro = ins.get_gyro();
+    const Vector3f &mag = compass.get_field();
     mavlink_msg_raw_imu_send(
         chan,
         micros(),
@@ -461,9 +462,29 @@ static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
         gyro.x * 1000.0f,
         gyro.y * 1000.0f,
         gyro.z * 1000.0f,
-        compass.mag_x,
-        compass.mag_y,
-        compass.mag_z);
+        mag.x,
+        mag.y,
+        mag.z);
+    if (ins.get_gyro_count() <= 1 &&
+        ins.get_accel_count() <= 1 &&
+        compass.get_count() <= 1) {
+        return;
+    }
+    const Vector3f &accel2 = ins.get_accel(1);
+    const Vector3f &gyro2 = ins.get_gyro(1);
+    const Vector3f &mag2 = compass.get_field(1);
+    mavlink_msg_scaled_imu2_send(
+        chan,
+        millis(),
+        accel2.x * 1000.0f / GRAVITY_MSS,
+        accel2.y * 1000.0f / GRAVITY_MSS,
+        accel2.z * 1000.0f / GRAVITY_MSS,
+        gyro2.x * 1000.0f,
+        gyro2.y * 1000.0f,
+        gyro2.z * 1000.0f,
+        mag2.x,
+        mag2.y,
+        mag2.z);        
 }
 
 static void NOINLINE send_raw_imu2(mavlink_channel_t chan)
@@ -1084,7 +1105,8 @@ GCS_MAVLINK::send_text_P(gcs_severity severity, const prog_char_t *str)
 
 void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
 {
-    struct Location tell_command = {};                                  // command for telemetry
+    struct Location tell_command;
+    memset(&tell_command, 0, sizeof(tell_command));
 
     switch (msg->msgid) {
 
