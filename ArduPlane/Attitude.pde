@@ -923,6 +923,7 @@ static bool demoing_servos;
 
 static void demo_servos(uint8_t i) 
 {
+	/*
     while(i > 0) {
         gcs_send_text_P(SEVERITY_LOW,PSTR("Demo Servos!"));
         demoing_servos = true;
@@ -934,6 +935,6 @@ static void demo_servos(uint8_t i)
         demoing_servos = false;
         mavlink_delay(400);
         i--;
-    }
+    }*/
 }
 
