@@ -56,9 +56,6 @@ void DataFlash_Block::WriteBlock(const void *pBuffer, uint16_t size)
                 n = df_PageSize - sizeof(struct PageHeader);
             }
             struct PageHeader ph = { df_FileNumber, df_FilePage };
-            /*BlockWrite(uint8_t BufferNum, uint16_t IntPageAdr,
-                                    const void *pHeader, uint8_t hdr_size,
-                                    const void *pBuffer, uint16_t size) = 0;*/
             BlockWrite(df_BufferNum, df_BufferIdx, &ph, sizeof(ph), pBuffer, n);
             df_BufferIdx += n + sizeof(ph);
         } else {
