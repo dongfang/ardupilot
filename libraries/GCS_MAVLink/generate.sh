@@ -4,7 +4,7 @@
 mavdir="$(dirname $0)"
 dname="$(basename $mavdir)"
 [ "$dname" = "GCS_MAVLink" ] || {
-    echo "This script should be run from the libraries/GCS_MAVLink directory"
+    echo "This script should be run from the ardupilot directory with the command ./libraries/GCS_MAVLink/generate.sh"
     exit 1
 }
 
@@ -18,3 +18,4 @@ rm -rf "$mavdir/include/*"
 
 echo "Generating C code"
 mavgen.py --lang=C --wire-protocol=1.0 --output=$mavdir/include/mavlink/v1.0 $mavdir/message_definitions/ardupilotmega.xml
+

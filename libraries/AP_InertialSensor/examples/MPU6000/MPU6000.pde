@@ -15,8 +15,18 @@
 #include <AP_Param.h>
 #include <AP_ADC.h>
 #include <AP_InertialSensor.h>
-#include <GCS_MAVLink.h>
 #include <AP_Notify.h>
+#include <AP_GPS.h>
+#include <AP_Baro.h>
+#include <Filter.h>
+#include <DataFlash.h>
+#include <GCS_MAVLink.h>
+#include <AP_AHRS.h>
+#include <AP_Airspeed.h>
+#include <AP_Vehicle.h>
+#include <AP_ADC_AnalogSource.h>
+#include <AP_Compass.h>
+#include <AP_Declination.h>
 
 const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 AP_InertialSensor_MPU6000 ins;
@@ -170,7 +180,7 @@ void run_test()
     while( !hal.console->available() ) {
 
         // wait until we have a sample
-        while (ins.sample_available() == false) /* noop */ ;
+        ins.wait_for_sample(1000);
 
         // read samples from ins
         ins.update();

@@ -34,6 +34,8 @@ public:
         k_param_initial_mode,
         k_param_scheduler,
         k_param_relay,
+        k_param_BoardConfig,
+        k_param_pivot_turn_angle,
 
         // IO pins
         k_param_rssi_pin = 20,
@@ -59,6 +61,7 @@ public:
         //
         k_param_compass_enabled = 130,
         k_param_steering_learn, // unused
+        k_param_NavEKF,  // Extended Kalman Filter Inertial Navigation Group
 
         // 140: battery controls
         k_param_battery_monitoring = 140,   // deprecated, can be deleted
@@ -165,6 +168,7 @@ public:
         k_param_rcmap,
         k_param_L1_controller,
         k_param_steerController,
+        k_param_barometer,
 
         // 254,255: reserved
         };
@@ -206,6 +210,7 @@ public:
     AP_Int8     auto_trigger_pin;
     AP_Float    auto_kickstart;
     AP_Float    turn_max_g;
+    AP_Int16    pivot_turn_angle;
 
     // RC channels
     RC_Channel      rc_1;

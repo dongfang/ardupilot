@@ -17,11 +17,8 @@ public:
 
     /* Concrete implementation of AP_InertialSensor functions: */
     bool            update();
-    float        	get_delta_time();    // get_delta_time returns the time period in seconds overwhich the sensor data was collected    
+    float        	get_delta_time() const;
     float           get_gyro_drift_rate();
-
-    // sample_available() - true when a new sample is available
-    bool            sample_available();
 
     // wait for a sample to be available, with timeout in milliseconds
     bool            wait_for_sample(uint16_t timeout_ms);
@@ -30,6 +27,8 @@ protected:
     uint16_t        _init_sensor(Sample_rate sample_rate);
 
 private:
+
+    bool            			_sample_available();
 
     AP_ADC *                    _adc;
 

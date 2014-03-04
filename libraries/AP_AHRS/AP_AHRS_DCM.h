@@ -25,8 +25,8 @@ class AP_AHRS_DCM : public AP_AHRS
 {
 public:
     // Constructors
-    AP_AHRS_DCM(AP_InertialSensor &ins, GPS *&gps) :
-        AP_AHRS(ins, gps),
+    AP_AHRS_DCM(AP_InertialSensor &ins, AP_Baro &baro, GPS *&gps) :
+        AP_AHRS(ins, baro, gps),
         _last_declination(0),
         _mag_earth(1,0)
     {
@@ -42,8 +42,10 @@ public:
     const Vector3f get_gyro(void) const {
         return _omega + _omega_P + _omega_yaw_P;
     }
+
+    // return rotation matrix representing rotaton from body to earth axes
     const Matrix3f &get_dcm_matrix(void) const {
-        return _dcm_matrix;
+        return _body_dcm_matrix;
     }
 
     // return the current drift correction integrator value
@@ -59,7 +61,7 @@ public:
     void reset_attitude(const float &roll, const float &pitch, const float &yaw);
 
     // dead-reckoning support
-    bool get_position(struct Location &loc);
+    virtual bool get_position(struct Location &loc);
 
     // status reporting
     float           get_error_rp(void);
@@ -72,9 +74,12 @@ public:
 
     // return an airspeed estimate if available. return true
     // if we have an estimate
-    bool airspeed_estimate(float *airspeed_ret);
+    bool airspeed_estimate(float *airspeed_ret) const;
 
     bool            use_compass(void);
+
+    void set_home(int32_t lat, int32_t lng, int32_t alt_cm);
+    void estimate_wind(void);
 
 private:
     float _ki;
@@ -89,11 +94,13 @@ private:
     void            drift_correction_yaw(void);
     float           yaw_error_compass();
     void            euler_angles(void);
-    void            estimate_wind(Vector3f &velocity);
     bool            have_gps(void) const;
 
-    // primary representation of attitude
+    // primary representation of attitude of board used for all inertial calculations
     Matrix3f _dcm_matrix;
+
+    // primary representation of attitude of flight vehicle body
+    Matrix3f _body_dcm_matrix;
 
     Vector3f _omega_P;                          // accel Omega proportional correction
     Vector3f _omega_yaw_P;                      // proportional yaw correction
@@ -103,13 +110,14 @@ private:
     Vector3f _omega;                            // Corrected Gyro_Vector data
 
     // variables to cope with delaying the GA sum to match GPS lag
-    Vector3f ra_delayed(const Vector3f &ra);
-    uint8_t   _ra_delay_length;
-    uint8_t   _ra_delay_next;
-    Vector3f *_ra_delay_buffer;
+    Vector3f ra_delayed(uint8_t instance, const Vector3f &ra);
+    Vector3f _ra_delay_buffer[INS_MAX_INSTANCES];
 
     // P term gain based on spin rate
     float           _P_gain(float spin_rate);
+
+    // P term yaw gain based on rate of change of horiz velocity
+    float           _yaw_gain(void) const;
 
     // state to support status reporting
     float _renorm_val_sum;
@@ -125,7 +133,7 @@ private:
     uint32_t _gps_last_update;
 
     // state of accel drift correction
-    Vector3f _ra_sum;
+    Vector3f _ra_sum[INS_MAX_INSTANCES];
     Vector3f _last_velocity;
     float _ra_deltat;
     uint32_t _ra_sum_start;

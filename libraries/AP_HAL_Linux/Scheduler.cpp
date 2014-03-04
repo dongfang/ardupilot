@@ -87,6 +87,10 @@ void LinuxScheduler::_microsleep(uint32_t usec)
 
 void LinuxScheduler::delay(uint16_t ms)
 {
+    if (stopped_clock_usec) {
+        stopped_clock_usec += 1000UL*ms;
+        return;
+    }
     uint32_t start = millis();
     
     while ((millis() - start) < ms) {
@@ -102,6 +106,9 @@ void LinuxScheduler::delay(uint16_t ms)
 
 uint32_t LinuxScheduler::millis() 
 {
+    if (stopped_clock_usec) {
+        return stopped_clock_usec/1000;
+    }
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return 1.0e3*((ts.tv_sec + (ts.tv_nsec*1.0e-9)) - 
@@ -111,6 +118,9 @@ uint32_t LinuxScheduler::millis()
 
 uint32_t LinuxScheduler::micros() 
 {
+    if (stopped_clock_usec) {
+        return stopped_clock_usec;
+    }
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return 1.0e6*((ts.tv_sec + (ts.tv_nsec*1.0e-9)) - 
@@ -314,6 +324,11 @@ void LinuxScheduler::system_initialized()
 void LinuxScheduler::reboot(bool hold_in_bootloader) 
 {
     for(;;);
+}
+
+void LinuxScheduler::stop_clock(uint64_t time_usec)
+{
+    stopped_clock_usec = time_usec;
 }
 
 #endif // CONFIG_HAL_BOARD
