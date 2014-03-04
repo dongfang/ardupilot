@@ -1,6 +1,5 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-
 static void read_control_switch()
 {
     static bool switch_debouncer;
@@ -13,6 +12,7 @@ static void read_control_switch()
     if (failsafe.ch3_failsafe || failsafe.ch3_counter > 0) {
         // when we are in ch3_failsafe mode then RC input is not
         // working, and we need to ignore the mode switch channel
+    	// ACHTUNG!! Does this paralyze R/C when we are in GCS failsafe?
         return;
     }
 
@@ -22,6 +22,8 @@ static void read_control_switch()
     // when returning to the previous mode after a failsafe or fence
     // breach. This channel is best used on a momentary switch (such
     // as a spring loaded trainer switch).
+    // ACHTUNG: Does it really make sense to have a force reread input?
+    // Aaah Okay it restarts a mode...
     if (oldSwitchPosition != switchPosition ||
         (g.reset_switch_chan != 0 &&
          hal.rcin->read(g.reset_switch_chan-1) > RESET_SWITCH_CHAN_PWM)) {
@@ -31,6 +33,8 @@ static void read_control_switch()
             // switch changes for 2 reads. This prevents momentary
             // spikes in the mode control channel from causing a mode
             // switch
+        	// ACHTUNG!!! This check does not verify that the new-value
+        	// reading was actually the same both times. Why not do that?
             switch_debouncer = true;
             return;
         }
@@ -59,7 +63,7 @@ static void read_control_switch()
 
 static uint8_t readSwitch(void){
     uint16_t pulsewidth = hal.rcin->read(g.flight_mode_channel - 1);
-    if (pulsewidth <= 910 || pulsewidth >= 2090) return 255;            // This is an error condition
+    if (pulsewidth <= 800 || pulsewidth >= 2200) return 255;            // This is an error condition
     if (pulsewidth > 1230 && pulsewidth <= 1360) return 1;
     if (pulsewidth > 1360 && pulsewidth <= 1490) return 2;
     if (pulsewidth > 1490 && pulsewidth <= 1620) return 3;
@@ -70,7 +74,6 @@ static uint8_t readSwitch(void){
 
 static void reset_control_switch()
 {
-    oldSwitchPosition = 0;
+    oldSwitchPosition = 254;
     read_control_switch();
 }
-

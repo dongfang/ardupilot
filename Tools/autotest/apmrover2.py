@@ -88,7 +88,6 @@ def drive_APMrover2(viewerip=None, map=False):
     mavproxy.expect('Received [0-9]+ parameters')
 
     # setup test parameters
-    mavproxy.send('param set SYSID_THISMAV %u\n' % random.randint(100, 200))
     mavproxy.send("param load %s/Rover.parm\n" % testdir)
     mavproxy.expect('Loaded [0-9]+ parameters')
 
@@ -150,6 +149,9 @@ def drive_APMrover2(viewerip=None, map=False):
         print("Home location: %s" % homeloc)
         if not drive_mission(mavproxy, mav, os.path.join(testdir, "rover1.txt")):
             print("Failed mission")
+            failed = True
+        if not log_download(mavproxy, mav, util.reltopdir("../buildlogs/APMrover2-log.bin")):
+            print("Failed log download")
             failed = True
 #        if not drive_left_circuit(mavproxy, mav):
 #            print("Failed left circuit")

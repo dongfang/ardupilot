@@ -30,9 +30,9 @@ public:
     };
 
     enum ArmingRequired {
-        NO = 0,
-        YES_MIN_PWM,
-        YES_ZERO_PWM,
+        NO           = 0,
+        YES_MIN_PWM  = 1,
+        YES_ZERO_PWM = 2
     };
 
     //for the hacky funciton pointer to gcs_send_text_p
@@ -47,6 +47,8 @@ public:
     bool is_armed();
     bool rudder_arming_enabled();
     uint16_t get_enabled_checks();
+
+    bool pre_arm_checks(bool report);
 
     //for params
     static const struct AP_Param::GroupInfo        var_info[];
@@ -70,19 +72,17 @@ private:
 
     void set_enabled_checks(uint16_t);
 
-    bool barometer_checks();
+    bool barometer_checks(bool report);
 
-    bool compass_checks();
+    bool compass_checks(bool report);
 
-    bool gps_checks();
+    bool gps_checks(bool report);
 
-    bool battery_checks();
+    bool battery_checks(bool report);
 
-    bool hardware_safety_check();
+    bool hardware_safety_check(bool report);
 
-    bool manual_transmitter_checks();
-
-    bool pre_arm_checks();
+    bool manual_transmitter_checks(bool report);
 };
 
 #endif //__AP_ARMING_H__

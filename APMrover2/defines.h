@@ -41,8 +41,7 @@ enum ch7_option {
 
 // HIL enumerations
 #define HIL_MODE_DISABLED			0
-#define HIL_MODE_ATTITUDE			1
-#define HIL_MODE_SENSORS			2
+#define HIL_MODE_SENSORS			1
 
 // Auto Pilot modes
 // ----------------
@@ -82,37 +81,6 @@ enum mode {
 
 #define MAV_CMD_CONDITION_YAW 23
 
-//  GCS Message ID's
-/// NOTE: to ensure we never block on sending MAVLink messages
-/// please keep each MSG_ to a single MAVLink message. If need be
-/// create new MSG_ IDs for additional messages on the same
-/// stream
-enum ap_message {
-    MSG_HEARTBEAT,
-    MSG_ATTITUDE,
-    MSG_LOCATION,
-    MSG_EXTENDED_STATUS1,
-    MSG_EXTENDED_STATUS2,
-    MSG_NAV_CONTROLLER_OUTPUT,
-    MSG_CURRENT_WAYPOINT,
-    MSG_VFR_HUD,
-    MSG_RADIO_OUT,
-    MSG_RADIO_IN,
-    MSG_RAW_IMU1,
-    MSG_RAW_IMU3,
-    MSG_GPS_RAW,
-    MSG_SYSTEM_TIME,
-    MSG_SERVO_OUT,
-    MSG_NEXT_WAYPOINT,
-    MSG_NEXT_PARAM,
-    MSG_STATUSTEXT,
-    MSG_AHRS,
-    MSG_SIMSTATE,
-    MSG_HWSTATUS,
-    MSG_RANGEFINDER,
-    MSG_RETRY_DEFERRED // this must be last
-};
-
 //  Logging parameters
 #define LOG_CTUN_MSG	        0x01
 #define LOG_NTUN_MSG    		0x02
@@ -126,6 +94,7 @@ enum ap_message {
 #define LOG_COMPASS_MSG         0x0A
 #define LOG_CAMERA_MSG          0x0B
 #define LOG_COMPASS2_MSG        0x0C
+#define LOG_STEERING_MSG        0x0D
 
 #define TYPE_AIRSTART_MSG		0x00
 #define TYPE_GROUNDSTART_MSG	0x01
@@ -144,6 +113,9 @@ enum ap_message {
 #define MASK_LOG_SONAR   		(1<<10)
 #define MASK_LOG_COMPASS   		(1<<11)
 #define MASK_LOG_CAMERA   		(1<<12)
+#define MASK_LOG_STEERING  		(1<<13)
+#define MASK_LOG_RC     		(1<<14)
+#define MASK_LOG_WHEN_DISARMED  (1UL<<16)
 
 // Waypoint Modes
 // ----------------
@@ -200,6 +172,12 @@ enum ap_message {
 #define CONFIG_INS_PX4     4
 #define CONFIG_INS_FLYMAPLE 5
 #define CONFIG_INS_L3G4200D 6
+
+// barometer driver types
+#define AP_BARO_BMP085   1
+#define AP_BARO_MS5611   2
+#define AP_BARO_PX4      3
+#define AP_BARO_HIL      4
 
 // compass driver types
 #define AP_COMPASS_HMC5843   1

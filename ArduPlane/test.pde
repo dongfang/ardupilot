@@ -255,14 +255,14 @@ test_relay(uint8_t argc, const Menu::arg *argv)
 
     while(1) {
         cliSerial->printf_P(PSTR("Relay on\n"));
-        relay.on();
+        relay.on(0);
         delay(3000);
         if(cliSerial->available() > 0) {
             return (0);
         }
 
         cliSerial->printf_P(PSTR("Relay off\n"));
-        relay.off();
+        relay.off(0);
         delay(3000);
         if(cliSerial->available() > 0) {
             return (0);
@@ -516,7 +516,7 @@ test_mag(uint8_t argc, const Menu::arg *argv)
                     // Calculate heading
                     const Matrix3f &m = ahrs.get_dcm_matrix();
                     heading = compass.calculate_heading(m);
-                    compass.null_offsets();
+                    compass.learn_offsets();
                 }
             }
 
@@ -584,19 +584,16 @@ test_pressure(uint8_t argc, const Menu::arg *argv)
     cliSerial->printf_P(PSTR("Uncalibrated relative airpressure\n"));
     print_hit_enter();
 
-    home.alt        = 0;
-    wp_distance = 0;
     init_barometer();
 
     while(1) {
         delay(100);
-        current_loc.alt = read_barometer() + home.alt;
 
         if (!barometer.healthy) {
             cliSerial->println_P(PSTR("not healthy"));
         } else {
             cliSerial->printf_P(PSTR("Alt: %0.2fm, Raw: %f Temperature: %.1f\n"),
-                                current_loc.alt / 100.0,
+                                barometer.get_altitude(),
                                 barometer.get_pressure(), 
                                 barometer.get_temperature());
         }

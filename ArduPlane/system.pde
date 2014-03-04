@@ -82,15 +82,26 @@ static void init_ardupilot()
     // standard gps running
     hal.uartB->begin(38400, 256, 16);
 
+#if GPS2_ENABLE
+    if (hal.uartE != NULL) {
+        hal.uartE->begin(38400, 256, 16);
+    }
+#endif
+
     cliSerial->printf_P(PSTR("\n\nInit " FIRMWARE_STRING
                          "\n\nFree RAM: %u\n"),
-                    memcheck_available_memory());
+                        hal.util->available_memory());
 
 
     //
     // Check the EEPROM format version before loading any parameters from EEPROM
     //
     load_parameters();
+
+    BoardConfig.init();
+
+    // allow servo set on all channels except first 4
+    ServoRelayEvents.set_channel_mask(0xFFF0);
 
     set_control_channels();
 
@@ -109,9 +120,6 @@ static void init_ardupilot()
 
     // init the GCS
     gcs[0].init(hal.uartA);
-    // Register mavlink_delay_cb, which will run anytime you have
-    // more than 5ms remaining in your call to hal.scheduler->delay
-    hal.scheduler->register_delay_callback(mavlink_delay_cb, 5);
 
     // we start by assuming USB connected, as we initialed the serial
     // port with SERIAL0_BAUD. check_usb_mux() fixes this if need be.    
@@ -134,7 +142,7 @@ static void init_ardupilot()
     mavlink_system.sysid = g.sysid_this_mav;
 
 #if LOGGING_ENABLED == ENABLED
-    DataFlash.Init();
+    DataFlash.Init(log_structure, sizeof(log_structure)/sizeof(log_structure[0]));
     if (!DataFlash.CardInserted()) {
         gcs_send_text_P(SEVERITY_LOW, PSTR("No dataflash card inserted"));
         g.log_bitmask.set(0);
@@ -145,10 +153,11 @@ static void init_ardupilot()
             gcs[i].reset_cli_timeout();
         }
     }
-    if (g.log_bitmask != 0) {
-        start_logging();
-    }
 #endif
+
+    // Register mavlink_delay_cb, which will run anytime you have
+    // more than 5ms remaining in your call to hal.scheduler->delay
+    hal.scheduler->register_delay_callback(mavlink_delay_cb, 5);
 
 #if CONFIG_INS_TYPE == CONFIG_INS_OILPAN || CONFIG_HAL_BOARD == HAL_BOARD_APM1
     apm1_adc.Init();      // APM ADC library initialization
@@ -173,6 +182,13 @@ static void init_ardupilot()
 	g_gps = &g_gps_driver;
     // GPS Initialization
     g_gps->init(hal.uartB, GPS::GPS_ENGINE_AIRBORNE_4G);
+
+#if GPS2_ENABLE
+    if (hal.uartE != NULL) {
+        g_gps2 = &g_gps2_driver;
+        g_gps2->init(hal.uartE, GPS::GPS_ENGINE_AIRBORNE_4G);
+    }
+#endif
 
     //mavlink_system.sysid = MAV_SYSTEM_ID;				// Using g.sysid_this_mav
     mavlink_system.compid = 1;          //MAV_COMP_ID_IMU;   // We do not check for comp id
@@ -204,7 +220,7 @@ static void init_ardupilot()
     }
 
     startup_ground();
-    if (g.log_bitmask & MASK_LOG_CMD)
+    if (should_log(MASK_LOG_CMD))
         Log_Write_Startup(TYPE_GROUNDSTART_MSG);
 
     // choose the nav controller
@@ -358,7 +374,7 @@ static void set_mode(enum FlightMode mode)
         throttle_suppressed = false;
     }
 
-    if (g.log_bitmask & MASK_LOG_MODE)
+    if (should_log(MASK_LOG_MODE))
         Log_Write_Mode(control_mode);
 
     // reset attitude integrators on mode change
@@ -377,11 +393,15 @@ static void check_long_failsafe()
             failsafe_long_on_event(FAILSAFE_LONG);
         } else if (!failsafe.rc_override_active && 
                    failsafe.state == FAILSAFE_SHORT && 
-           (tnow - failsafe.ch3_timer_ms) > g.long_fs_timeout*1000) {
+                   (tnow - failsafe.ch3_timer_ms) > g.long_fs_timeout*1000) {
             failsafe_long_on_event(FAILSAFE_LONG);
-        } else if (g.gcs_heartbeat_fs_enabled && 
-            failsafe.last_heartbeat_ms != 0 &&
-            (tnow - failsafe.last_heartbeat_ms) > g.long_fs_timeout*1000) {
+        } else if (g.gcs_heartbeat_fs_enabled != GCS_FAILSAFE_OFF && 
+                   failsafe.last_heartbeat_ms != 0 &&
+                   (tnow - failsafe.last_heartbeat_ms) > g.long_fs_timeout*1000) {
+            failsafe_long_on_event(FAILSAFE_GCS);
+        } else if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HB_RSSI && 
+                   failsafe.last_radio_status_remrssi_ms != 0 &&
+                   (tnow - failsafe.last_radio_status_remrssi_ms) > g.long_fs_timeout*1000) {
             failsafe_long_on_event(FAILSAFE_GCS);
         }
     } else {
@@ -476,9 +496,6 @@ static void update_notify()
 static void resetPerfData(void) {
     mainLoop_count                  = 0;
     G_Dt_max                        = 0;
-    ahrs.renorm_range_count         = 0;
-    ahrs.renorm_blowup_count        = 0;
-    gps_fix_count                   = 0;
     perf_mon_timer                  = millis();
 }
 
@@ -527,17 +544,16 @@ static void check_usb_mux(void)
 #endif
 }
 
-
 /*
  * Read Vcc vs 1.1v internal reference
  * With some +-1 noise reading that, the resulting voltage (in millivolts) will have noise:
  * +-1*5.5/1.1 = +-4.4mV
- */
+
 uint16_t board_voltage(void)
 {
     return vcc_pin->voltage_latest() * 1000;
 }
-
+ */
 
 static void
 print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode)
@@ -576,6 +592,9 @@ print_flight_mode(AP_HAL::BetterStream *port, uint8_t mode)
     case LOITER:
         port->print_P(PSTR("Loiter"));
         break;
+    case GUIDED:
+        port->print_P(PSTR("Guided"));
+        break;
     default:
         port->printf_P(PSTR("Mode(%u)"), (unsigned)mode);
         break;
@@ -603,4 +622,23 @@ static void servo_write(uint8_t ch, uint16_t pwm)
 #endif
     hal.rcout->enable_ch(ch);
     hal.rcout->write(ch, pwm);
+}
+
+/*
+  should we log a message type now?
+ */
+static bool should_log(uint32_t mask)
+{
+    if (!(mask & g.log_bitmask) || in_mavlink_delay) {
+        return false;
+    }
+    bool ret = ahrs.get_armed() || (g.log_bitmask & MASK_LOG_WHEN_DISARMED) != 0;
+    if (ret && !DataFlash.logging_started() && !in_log_download) {
+        // we have to set in_mavlink_delay to prevent logging while
+        // writing headers
+        in_mavlink_delay = true;
+        start_logging();
+        in_mavlink_delay = false;
+    }
+    return ret;
 }

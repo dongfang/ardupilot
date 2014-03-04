@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduRover v2.44beta1"
+#define THISFIRMWARE "ArduRover v2.45"
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -70,6 +70,7 @@
 #include <AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
 #include <AP_InertialSensor.h> // Inertial Sensor (uncalibated IMU) Library
 #include <AP_AHRS.h>         // ArduPilot Mega DCM Library
+#include <AP_NavEKF.h>
 #include <PID.h>            // PID library
 #include <RC_Channel.h>     // RC Channel Library
 #include <AP_RangeFinder.h>	// Range finder library
@@ -79,12 +80,12 @@
 #include <ModeFilter.h>		// Mode Filter from Filter library
 #include <AverageFilter.h>	// Mode Filter from Filter library
 #include <AP_Relay.h>       // APM relay
+#include <AP_ServoRelayEvents.h>
 #include <AP_Mount.h>		// Camera/Antenna mount
 #include <AP_Camera.h>		// Camera triggering
 #include <GCS_MAVLink.h>    // MAVLink GCS definitions
 #include <AP_Airspeed.h>    // needed for AHRS build
 #include <AP_Vehicle.h>     // needed for AHRS build
-#include <memcheck.h>
 #include <DataFlash.h>
 #include <AP_RCMapper.h>        // RC input mapping library
 #include <SITL.h>
@@ -93,6 +94,7 @@
 #include <AP_Navigation.h>
 #include <APM_Control.h>
 #include <AP_L1_Control.h>
+#include <AP_BoardConfig.h>
 
 #include <AP_HAL_AVR.h>
 #include <AP_HAL_AVR_SITL.h>
@@ -144,6 +146,9 @@ static AP_Scheduler scheduler;
 // mapping between input channels
 static RCMapper rcmap;
 
+// board specific config
+static AP_BoardConfig BoardConfig;
+
 // primary control channels
 static RC_Channel *channel_steer;
 static RC_Channel *channel_throttle;
@@ -163,16 +168,17 @@ static DataFlash_APM1 DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
 static DataFlash_APM2 DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
-//static DataFlash_File DataFlash("/tmp/APMlogs");
-static DataFlash_SITL DataFlash;
+static DataFlash_File DataFlash("logs");
+//static DataFlash_SITL DataFlash;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
-static DataFlash_File DataFlash("/fs/microsd/APM/logs");
+static DataFlash_File DataFlash("/fs/microsd/APM/LOGS");
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 static DataFlash_File DataFlash("logs");
 #else
 DataFlash_Empty DataFlash;
 #endif
 
+static bool in_log_download;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Sensors
@@ -189,6 +195,9 @@ DataFlash_Empty DataFlash;
 
 // All GPS access should be through this pointer.
 static GPS         *g_gps;
+#if GPS2_ENABLE
+static GPS         *g_gps2;
+#endif
 
 // flight modes convenience array
 static AP_Int8		*modes = &g.mode1;
@@ -210,6 +219,9 @@ static AP_Compass_HIL compass;
 // GPS selection
 #if   GPS_PROTOCOL == GPS_PROTOCOL_AUTO
 AP_GPS_Auto     g_gps_driver(&g_gps);
+#if GPS2_ENABLE
+AP_GPS_UBLOX    g_gps2_driver;
+#endif
 
 #elif GPS_PROTOCOL == GPS_PROTOCOL_NMEA
 AP_GPS_NMEA     g_gps_driver;
@@ -252,7 +264,31 @@ AP_InertialSensor_Oilpan ins( &adc );
   #error Unrecognised CONFIG_INS_TYPE setting.
 #endif // CONFIG_INS_TYPE
 
-AP_AHRS_DCM ahrs(ins, g_gps);
+
+#if CONFIG_BARO == AP_BARO_BMP085
+static AP_Baro_BMP085 barometer;
+#elif CONFIG_BARO == AP_BARO_PX4
+static AP_Baro_PX4 barometer;
+#elif CONFIG_BARO == AP_BARO_HIL
+static AP_Baro_HIL barometer;
+#elif CONFIG_BARO == AP_BARO_MS5611
+ #if CONFIG_MS5611_SERIAL == AP_BARO_MS5611_SPI
+ static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::spi);
+ #elif CONFIG_MS5611_SERIAL == AP_BARO_MS5611_I2C
+ static AP_Baro_MS5611 barometer(&AP_Baro_MS5611::i2c);
+ #else
+ #error Unrecognized CONFIG_MS5611_SERIAL setting.
+ #endif
+#else
+ #error Unrecognized CONFIG_BARO setting
+#endif
+
+// Inertial Navigation EKF
+#if AP_AHRS_NAVEKF_AVAILABLE
+AP_AHRS_NavEKF ahrs(ins, barometer, g_gps);
+#else
+AP_AHRS_DCM ahrs(ins, barometer, g_gps);
+#endif
 
 static AP_L1_Control L1_controller(ahrs);
 
@@ -277,8 +313,6 @@ static GCS_MAVLINK gcs[MAVLINK_COMM_NUM_BUFFERS];
 // is to take the 0 to 1024 range down to an 8 bit range for MAVLink
 AP_HAL::AnalogSource *rssi_analog_source;
 
-AP_HAL::AnalogSource *vcc_pin;
-
 ////////////////////////////////////////////////////////////////////////////////
 // SONAR selection
 ////////////////////////////////////////////////////////////////////////////////
@@ -288,6 +322,8 @@ static AP_RangeFinder_analog sonar2;
 
 // relay support
 AP_Relay relay;
+
+AP_ServoRelayEvents ServoRelayEvents(relay);
 
 // Camera
 #if CAMERA == ENABLED
@@ -354,6 +390,7 @@ static struct {
     uint32_t rc_override_timer;
     uint32_t start_time;
     uint8_t triggered;
+    uint32_t last_valid_rc_ms;
 } failsafe;
 
 // notification object for LEDs, buzzers etc (parameter set to false disables external leds)
@@ -371,11 +408,6 @@ static const 	float t7			= 10000000.0;
 // A counter used to count down valid gps fixes to allow the gps estimate to settle
 // before recording our home position (and executing a ground start if we booted with an air start)
 static uint8_t 	ground_start_count	= 5;
-// Used to compute a speed estimate from the first valid gps fixes to decide if we are 
-// on the ground or in the air.  Used to decide if a ground start is appropriate if we
-// booted with an air start.
-static int16_t     ground_start_avg;
-static int32_t          gps_base_alt;		
 
 ////////////////////////////////////////////////////////////////////////////////
 // Location & Navigation
@@ -463,22 +495,6 @@ static float wp_distance;
 static int32_t wp_totalDistance;
 
 ////////////////////////////////////////////////////////////////////////////////
-// repeating event control
-////////////////////////////////////////////////////////////////////////////////
-// Flag indicating current event type
-static uint8_t 		event_id;
-// when the event was started in ms
-static int32_t 		event_timer;
-// how long to delay the next firing of event in millis
-static uint16_t 	event_delay;					
-// how many times to cycle : -1 (or -2) = forever, 2 = do one cycle, 4 = do two cycles
-static int16_t 		event_repeat = 0;
-// per command value, such as PWM for servos
-static int16_t 		event_value; 
-// the value used to cycle events (alternate value to event_value)
-static int16_t 		event_undo_value;
-
-////////////////////////////////////////////////////////////////////////////////
 // Conditional command
 ////////////////////////////////////////////////////////////////////////////////
 // A value used in condition commands (eg delay, change alt, etc.)
@@ -495,7 +511,7 @@ static int16_t 		condition_rate;
 // Location structure defined in AP_Common
 ////////////////////////////////////////////////////////////////////////////////
 // The home location used for RTL.  The location is set when we first get stable GPS lock
-static struct 	Location home;
+static const struct	Location &home = ahrs.get_home();
 // Flag for if we have g_gps lock and have set the home location
 static bool	home_is_set;
 // The location of the previous waypoint.  Used for track following and altitude ramp calculations
@@ -524,8 +540,6 @@ static float G_Dt						= 0.02;
 static int32_t 	perf_mon_timer;
 // The maximum main loop execution time recorded in the current performance monitoring interval
 static uint32_t 	G_Dt_max;
-// The number of gps fixes recorded in the current performance monitoring interval
-static uint8_t 	gps_fix_count = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 // System Timers
@@ -553,13 +567,16 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
 	{ read_radio,             1,   1000 },
     { ahrs_update,            1,   6400 },
     { read_sonars,            1,   2000 },
-    { update_current_mode,    1,   1000 },
-    { set_servos,             1,   1000 },
-    { update_GPS,             5,   2500 },
+    { update_current_mode,    1,   1500 },
+    { set_servos,             1,   1500 },
+    { update_GPS_50Hz,        1,   2500 },
+    { update_GPS_10Hz,        5,   2500 },
+    { update_alt,             5,   3400 },
     { navigate,               5,   1600 },
     { update_compass,         5,   2000 },
     { update_commands,        5,   1000 },
-    { update_logging,         5,   1000 },
+    { update_logging1,        5,   1000 },
+    { update_logging2,        5,   1000 },
     { gcs_retry_deferred,     1,   1000 },
     { gcs_update,             1,   1700 },
     { gcs_data_stream_send,   1,   3000 },
@@ -567,7 +584,7 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
     { read_trim_switch,       5,   1000 },
     { read_battery,           5,   1000 },
     { read_receiver_rssi,     5,   1000 },
-    { update_events,         15,   1000 },
+    { update_events,          1,   1000 },
     { check_usb_mux,         15,   1000 },
     { mount_update,           1,    600 },
     { gcs_failsafe_check,     5,    600 },
@@ -581,7 +598,6 @@ static const AP_Scheduler::Task scheduler_tasks[] PROGMEM = {
   setup is called when the sketch starts
  */
 void setup() {
-	memcheck_init();
     cliSerial = hal.console;
 
     // load the default values of variables listed in var_info[]
@@ -597,7 +613,6 @@ void setup() {
     battery.init();
 
     rssi_analog_source = hal.analogin->channel(ANALOG_INPUT_NONE);
-    vcc_pin = hal.analogin->channel(ANALOG_INPUT_BOARD_VCC);
 
 	init_ardupilot();
 
@@ -634,6 +649,8 @@ void loop()
 // update AHRS system
 static void ahrs_update()
 {
+    ahrs.set_armed(hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED);
+
 #if HIL_MODE != HIL_MODE_DISABLED
     // update hil before AHRS update
     gcs_update();
@@ -647,10 +664,10 @@ static void ahrs_update()
 
     ahrs.update();
 
-    if (g.log_bitmask & MASK_LOG_ATTITUDE_FAST)
+    if (should_log(MASK_LOG_ATTITUDE_FAST))
         Log_Write_Attitude();
 
-    if (g.log_bitmask & MASK_LOG_IMU)
+    if (should_log(MASK_LOG_IMU))
         DataFlash.Log_Write_IMU(ins);
 }
 
@@ -665,6 +682,14 @@ static void mount_update(void)
 #if CAMERA == ENABLED
     camera.trigger_pic_cleanup();
 #endif
+}
+
+static void update_alt()
+{
+    barometer.read();
+    if (should_log(MASK_LOG_IMU)) {
+        Log_Write_Baro();
+    }
 }
 
 /*
@@ -695,8 +720,8 @@ static void update_compass(void)
     if (g.compass_enabled && compass.read()) {
         ahrs.set_compass(&compass);
         // update offsets
-        compass.null_offsets();
-        if (g.log_bitmask & MASK_LOG_COMPASS) {
+        compass.learn_offsets();
+        if (should_log(MASK_LOG_COMPASS)) {
             Log_Write_Compass();
         }
     } else {
@@ -707,16 +732,31 @@ static void update_compass(void)
 /*
   log some key data - 10Hz
  */
-static void update_logging(void)
+static void update_logging1(void)
 {
-    if ((g.log_bitmask & MASK_LOG_ATTITUDE_MED) && !(g.log_bitmask & MASK_LOG_ATTITUDE_FAST))
+    if (should_log(MASK_LOG_ATTITUDE_MED) && !should_log(MASK_LOG_ATTITUDE_FAST))
         Log_Write_Attitude();
     
-    if (g.log_bitmask & MASK_LOG_CTUN)
+    if (should_log(MASK_LOG_CTUN))
         Log_Write_Control_Tuning();
 
-    if (g.log_bitmask & MASK_LOG_NTUN)
+    if (should_log(MASK_LOG_NTUN))
         Log_Write_Nav_Tuning();
+}
+
+/*
+  log some key data - 10Hz
+ */
+static void update_logging2(void)
+{
+    if (should_log(MASK_LOG_STEERING)) {
+        if (control_mode == STEERING || control_mode == AUTO || control_mode == RTL || control_mode == GUIDED) {
+            Log_Write_Steering();
+        }
+    }
+
+    if (should_log(MASK_LOG_RC))
+        Log_Write_RC();
 }
 
 
@@ -725,14 +765,7 @@ static void update_logging(void)
  */
 static void update_aux(void)
 {
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
-    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8, &g.rc_9, &g.rc_10, &g.rc_11, &g.rc_12);
-#elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
-    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8, &g.rc_10, &g.rc_11);
-#else
-    update_aux_servo_function(&g.rc_5, &g.rc_6, &g.rc_7, &g.rc_8);
-#endif
-    enable_aux_servos();
+    RC_Channel_aux::enable_aux_servos();
         
 #if MOUNT == ENABLED
     camera_mount.update_mount_type();
@@ -744,7 +777,7 @@ static void update_aux(void)
  */
 static void one_second_loop(void)
 {
-	if (g.log_bitmask & MASK_LOG_CURRENT)
+	if (should_log(MASK_LOG_CURRENT))
 		Log_Write_Current();
 	// send a heartbeat
 	gcs_send_message(MSG_HEARTBEAT);
@@ -773,7 +806,7 @@ static void one_second_loop(void)
         if (scheduler.debug() != 0) {
             hal.console->printf_P(PSTR("G_Dt_max=%lu\n"), (unsigned long)G_Dt_max);
         }
-        if (g.log_bitmask & MASK_LOG_PM)
+        if (should_log(MASK_LOG_PM))
             Log_Write_Performance();
         G_Dt_max = 0;
         resetPerfData();
@@ -788,26 +821,41 @@ static void one_second_loop(void)
     }
 }
 
-static void update_GPS(void)
+static void update_GPS_50Hz(void)
 {        
     static uint32_t last_gps_reading;
 	g_gps->update();
 
+#if GPS2_ENABLE
+    static uint32_t last_gps2_reading;
+    if (g_gps2 != NULL) {
+        g_gps2->update();
+        if (g_gps2->last_message_time_ms() != last_gps2_reading) {
+            last_gps2_reading = g_gps2->last_message_time_ms();
+            if (g.log_bitmask & MASK_LOG_GPS) {
+                DataFlash.Log_Write_GPS2(g_gps2);
+            }
+        }
+    }
+#endif
+
     if (g_gps->last_message_time_ms() != last_gps_reading) {
         last_gps_reading = g_gps->last_message_time_ms();
-        if (g.log_bitmask & MASK_LOG_GPS) {
+        if (should_log(MASK_LOG_GPS)) {
             DataFlash.Log_Write_GPS(g_gps, current_loc.alt);
         }
     }
+}
 
-    have_position = ahrs.get_projected_position(current_loc);
+
+static void update_GPS_10Hz(void)
+{        
+    have_position = ahrs.get_position(current_loc);
 
 	if (g_gps->new_data && g_gps->status() >= GPS::GPS_OK_FIX_3D) {
-		gps_fix_count++;
 
 		if(ground_start_count > 1){
 			ground_start_count--;
-			ground_start_avg += g_gps->ground_speed_cm;
 
 		} else if (ground_start_count == 1) {
 			// We countdown N number of good GPS fixes
@@ -845,6 +893,7 @@ static void update_current_mode(void)
     case AUTO:
     case RTL:
     case GUIDED:
+        set_reverse(false);
         calc_lateral_acceleration();
         calc_nav_steer();
         calc_throttle(g.speed_cruise);
@@ -899,6 +948,7 @@ static void update_current_mode(void)
         // hold position - stop motors and center steering
         channel_throttle->servo_out = 0;
         channel_steer->servo_out = 0;
+        set_reverse(false);
         break;
 
     case INITIALISING:

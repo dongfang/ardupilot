@@ -22,7 +22,7 @@ static void failsafe_radio_on_event()
             }else if(g.failsafe_throttle == FS_THR_ENABLED_ALWAYS_LAND) {
                 // if failsafe_throttle is 3 (i.e. FS_THR_ENABLED_ALWAYS_LAND) land immediately
                 set_mode(LAND);
-            }else if(home_distance > wp_nav.get_waypoint_radius()) {
+            }else if(home_distance > wp_nav.get_wp_radius()) {
                 if (!set_mode(RTL)) {
                     set_mode(LAND);
                 }
@@ -34,7 +34,7 @@ static void failsafe_radio_on_event()
         case AUTO:
             // failsafe_throttle is 1 do RTL, 2 means continue with the mission
             if (g.failsafe_throttle == FS_THR_ENABLED_ALWAYS_RTL) {
-                if(home_distance > wp_nav.get_waypoint_radius()) {
+                if(home_distance > wp_nav.get_wp_radius()) {
                     if (!set_mode(RTL)) {
                         set_mode(LAND);
                     }
@@ -56,7 +56,7 @@ static void failsafe_radio_on_event()
             }else if(g.failsafe_throttle == FS_THR_ENABLED_ALWAYS_LAND) {
                 // if failsafe_throttle is 3 (i.e. FS_THR_ENABLED_ALWAYS_LAND) land immediately
                 set_mode(LAND);
-            }else if(home_distance > wp_nav.get_waypoint_radius()) {
+            }else if(home_distance > wp_nav.get_wp_radius()) {
                 if (!set_mode(RTL)) {
                     set_mode(LAND);
                 }
@@ -74,7 +74,7 @@ static void failsafe_radio_on_event()
             if(g.failsafe_throttle == FS_THR_ENABLED_ALWAYS_LAND) {
                 // if failsafe_throttle is 3 (i.e. FS_THR_ENABLED_ALWAYS_LAND) land immediately
                 set_mode(LAND);
-            }else if(home_distance > wp_nav.get_waypoint_radius()) {
+            }else if(home_distance > wp_nav.get_wp_radius()) {
                 if (!set_mode(RTL)){
                     set_mode(LAND);
                 }
@@ -118,7 +118,7 @@ static void failsafe_battery_event(void)
                     init_disarm_motors();
                 }else{
                     // set mode to RTL or LAND
-                    if (g.failsafe_battery_enabled == FS_BATT_RTL && home_distance > wp_nav.get_waypoint_radius()) {
+                    if (g.failsafe_battery_enabled == FS_BATT_RTL && home_distance > wp_nav.get_wp_radius()) {
                         if (!set_mode(RTL)) {
                             set_mode(LAND);
                         }
@@ -129,7 +129,7 @@ static void failsafe_battery_event(void)
                 break;
             case AUTO:
                 // set mode to RTL or LAND
-                if (home_distance > wp_nav.get_waypoint_radius()) {
+                if (home_distance > wp_nav.get_wp_radius()) {
                     if (!set_mode(RTL)) {
                         set_mode(LAND);
                     }
@@ -146,7 +146,7 @@ static void failsafe_battery_event(void)
                 }
             default:
                 // set mode to RTL or LAND
-                if (g.failsafe_battery_enabled == FS_BATT_RTL && home_distance > wp_nav.get_waypoint_radius()) {
+                if (g.failsafe_battery_enabled == FS_BATT_RTL && home_distance > wp_nav.get_wp_radius()) {
                     if (!set_mode(RTL)) {
                         set_mode(LAND);
                     }
@@ -264,7 +264,7 @@ static void failsafe_gcs_check()
             // if throttle is zero disarm motors
             if (g.rc_3.control_in == 0) {
                 init_disarm_motors();
-            }else if(home_distance > wp_nav.get_waypoint_radius()) {
+            }else if(home_distance > wp_nav.get_wp_radius()) {
                 if (!set_mode(RTL)) {
                     set_mode(LAND);
                 }
@@ -276,7 +276,7 @@ static void failsafe_gcs_check()
         case AUTO:
             // if g.failsafe_gcs is 1 do RTL, 2 means continue with the mission
             if (g.failsafe_gcs == FS_GCS_ENABLED_ALWAYS_RTL) {
-                if (home_distance > wp_nav.get_waypoint_radius()) {
+                if (home_distance > wp_nav.get_wp_radius()) {
                     if (!set_mode(RTL)) {
                         set_mode(LAND);
                     }
@@ -288,7 +288,7 @@ static void failsafe_gcs_check()
             // if failsafe_throttle is 2 (i.e. FS_THR_ENABLED_CONTINUE_MISSION) no need to do anything
             break;
         default:
-            if(home_distance > wp_nav.get_waypoint_radius()) {
+            if(home_distance > wp_nav.get_wp_radius()) {
                 if (!set_mode(RTL)) {
                     set_mode(LAND);
                 }
@@ -307,28 +307,8 @@ static void failsafe_gcs_off_event(void)
     Log_Write_Error(ERROR_SUBSYSTEM_FAILSAFE_GCS, ERROR_CODE_FAILSAFE_RESOLVED);
 }
 
-static void update_events()     // Used for MAV_CMD_DO_REPEAT_SERVO and MAV_CMD_DO_REPEAT_RELAY
+static void update_events()
 {
-    if(event_repeat == 0 || (millis() - event_timer) < event_delay)
-        return;
-
-    if(event_repeat != 0) {             // event_repeat = -1 means repeat forever
-        event_timer = millis();
-
-        if (event_id >= CH_5 && event_id <= CH_8) {
-            if(event_repeat%2) {
-                hal.rcout->write(event_id, event_value);                 // send to Servos
-            } else {
-                hal.rcout->write(event_id, event_undo_value);
-            }
-        }
-
-        if  (event_id == RELAY_TOGGLE) {
-            relay.toggle();
-        }
-        if (event_repeat > 0) {
-            event_repeat--;
-        }
-    }
+    ServoRelayEvents.update_events();
 }
 

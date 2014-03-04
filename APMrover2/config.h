@@ -60,33 +60,50 @@
 #if CONFIG_HAL_BOARD == HAL_BOARD_APM1
 # define CONFIG_INS_TYPE   CONFIG_INS_OILPAN
 # define CONFIG_COMPASS  AP_COMPASS_HMC5843
+# define CONFIG_BARO     AP_BARO_BMP085
 # define BATTERY_PIN_1	  0
 # define CURRENT_PIN_1	  1
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
 # define CONFIG_INS_TYPE   CONFIG_INS_MPU6000
 # define CONFIG_COMPASS  AP_COMPASS_HMC5843
+# ifdef APM2_BETA_HARDWARE
+#  define CONFIG_BARO     AP_BARO_BMP085
+# else // APM2 Production Hardware (default)
+#  define CONFIG_BARO          AP_BARO_MS5611
+#  define CONFIG_MS5611_SERIAL AP_BARO_MS5611_SPI
+# endif
 # define BATTERY_PIN_1	  1
 # define CURRENT_PIN_1	  2
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
 # define CONFIG_INS_TYPE CONFIG_INS_HIL
 # define CONFIG_COMPASS  AP_COMPASS_HIL
+# define CONFIG_BARO     AP_BARO_HIL
 # define BATTERY_PIN_1	  1
 # define CURRENT_PIN_1	  2
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
 # define CONFIG_INS_TYPE   CONFIG_INS_PX4
 # define CONFIG_COMPASS  AP_COMPASS_PX4
+# define CONFIG_BARO AP_BARO_PX4
 # define BATTERY_PIN_1	  -1
 # define CURRENT_PIN_1	  -1
 #elif CONFIG_HAL_BOARD == HAL_BOARD_FLYMAPLE
 # define CONFIG_INS_TYPE   CONFIG_INS_FLYMAPLE
 # define CONFIG_COMPASS  AP_COMPASS_HMC5843
+# define CONFIG_BARO AP_BARO_BMP085
 # define BATTERY_PIN_1     20
 # define CURRENT_PIN_1	   19
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 # define CONFIG_INS_TYPE   CONFIG_INS_L3G4200D
 # define CONFIG_COMPASS  AP_COMPASS_HMC5843
+# define CONFIG_BARO     AP_BARO_BMP085
 # define BATTERY_PIN_1     -1
 # define CURRENT_PIN_1	   -1
+#endif
+
+#if HAL_CPU_CLASS >= HAL_CPU_CLASS_150
+#define GPS2_ENABLE 1
+#else
+#define GPS2_ENABLE 0
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -110,6 +127,8 @@
  #define CONFIG_INS_TYPE CONFIG_INS_HIL
  #undef  CONFIG_COMPASS
  #define CONFIG_COMPASS  AP_COMPASS_HIL
+ #undef GPS2_ENABLE
+ #define GPS2_ENABLE 0
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -319,6 +338,7 @@
 # define LOGGING_ENABLED		ENABLED
 #endif
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_APM2
 #define DEFAULT_LOG_BITMASK     \
     MASK_LOG_ATTITUDE_MED | \
     MASK_LOG_GPS | \
@@ -330,7 +350,12 @@
     MASK_LOG_SONAR | \
     MASK_LOG_COMPASS | \
     MASK_LOG_CURRENT | \
+    MASK_LOG_STEERING | \
     MASK_LOG_CAMERA
+#else
+// other systems have plenty of space for full logs
+#define DEFAULT_LOG_BITMASK   0xffff
+#endif
 
 
 

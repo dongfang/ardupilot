@@ -150,38 +150,39 @@ void AP_TECS::update_50hz(float hgt_afe)
 	}
 	_update_50hz_last_usec = now;	
 
-	// Get height acceleration
-	float hgt_ddot_mea = -(_ahrs.get_accel_ef().z + GRAVITY_MSS);
-	// Perform filter calculation using backwards Euler integration
-    // Coefficients selected to place all three filter poles at omega
-	float omega2 = _hgtCompFiltOmega*_hgtCompFiltOmega;
-	float hgt_err = hgt_afe - _integ3_state;
-	float integ1_input = hgt_err * omega2 * _hgtCompFiltOmega;
-	_integ1_state = _integ1_state + integ1_input * DT;
-	float integ2_input = _integ1_state + hgt_ddot_mea + hgt_err * omega2 * 3.0f;
-	_integ2_state = _integ2_state + integ2_input * DT;
-	float integ3_input = _integ2_state + hgt_err * _hgtCompFiltOmega * 3.0f;
-    // If more than 1 second has elapsed since last update then reset the integrator state
-    // to the measured height
-    if (DT > 1.0) {
-        _integ3_state = hgt_afe;
-    } else {
-	    _integ3_state = _integ3_state + integ3_input*DT;
-    }
+	// USe inertial nav verical velocity and height if available
+	Vector3f posned, velned;
+	if (_ahrs.get_velocity_NED(velned) && _ahrs.get_relative_position_NED(posned)) {
+		_integ2_state   = - velned.z;
+		_integ3_state   = - posned.z;
+	} else {
+		// Get height acceleration
+		float hgt_ddot_mea = -(_ahrs.get_accel_ef().z + GRAVITY_MSS);
+		// Perform filter calculation using backwards Euler integration
+		// Coefficients selected to place all three filter poles at omega
+		float omega2 = _hgtCompFiltOmega*_hgtCompFiltOmega;
+		float hgt_err = hgt_afe - _integ3_state;
+		float integ1_input = hgt_err * omega2 * _hgtCompFiltOmega;
+		_integ1_state = _integ1_state + integ1_input * DT;
+		float integ2_input = _integ1_state + hgt_ddot_mea + hgt_err * omega2 * 3.0f;
+		_integ2_state = _integ2_state + integ2_input * DT;
+		float integ3_input = _integ2_state + hgt_err * _hgtCompFiltOmega * 3.0f;
+		// If more than 1 second has elapsed since last update then reset the integrator state
+		// to the measured height
+		if (DT > 1.0) {
+		    _integ3_state = hgt_afe;
+		} else {
+			_integ3_state = _integ3_state + integ3_input*DT;
+		}
+	}
 
 	// Update and average speed rate of change
-    // Only required if airspeed is being measured and controlled
-    float temp = 0;
-	if (_ahrs.airspeed_sensor_enabled() && _ahrs.airspeed_estimate_true(&_EAS)) {
-        // Get DCM
-        const Matrix3f &rotMat = _ahrs.get_dcm_matrix();
-	    // Calculate speed rate of change
-	    temp = rotMat.c.x * GRAVITY_MSS + _ahrs.get_ins().get_accel().x;
-	    // take 5 point moving average
-        _vel_dot = _vdot_filter.apply(temp);
-    } else {
-       _vel_dot = 0.0f;
-    }
+    // Get DCM
+    const Matrix3f &rotMat = _ahrs.get_dcm_matrix();
+	// Calculate speed rate of change
+	float temp = rotMat.c.x * GRAVITY_MSS + _ahrs.get_ins().get_accel().x;
+	// take 5 point moving average
+    _vel_dot = _vdot_filter.apply(temp);
 
 }
 
@@ -515,9 +516,16 @@ void AP_TECS::_update_pitch(void)
     // Apply max and min values for integrator state that will allow for no more than 
 	// 5deg of saturation. This allows for some pitch variation due to gusts before the 
 	// integrator is clipped. Otherwise the effectiveness of the integrator will be reduced in turbulence
+    // During climbout/takeoff, bias the demanded pitch angle so that zero speed error produces a pitch angle 
+    // demand equal to the minimum value (which is )set by the mission plan during this mode). Otherwise the
+    // integrator has to catch up before the nose can be raised to reduce speed during climbout.
 	float gainInv = (_integ5_state * _timeConst * GRAVITY_MSS);
     float temp = SEB_error + SEBdot_error * _ptchDamp + SEBdot_dem * _timeConst;
-	_integ7_state = constrain_float(_integ7_state, (gainInv * (_PITCHminf - 0.0783f)) - temp, (gainInv * (_PITCHmaxf + 0.0783f)) - temp);
+    if (_flight_stage == AP_TECS::FLIGHT_TAKEOFF)
+    {
+    	temp += _PITCHminf * gainInv;
+    }
+    _integ7_state = constrain_float(_integ7_state, (gainInv * (_PITCHminf - 0.0783f)) - temp, (gainInv * (_PITCHmaxf + 0.0783f)) - temp);
 
     // Calculate pitch demand from specific energy balance signals
     _pitch_dem_unc = (temp + _integ7_state) / gainInv;

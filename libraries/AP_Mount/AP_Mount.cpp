@@ -11,15 +11,15 @@
 
 #if defined( __AVR_ATmega1280__ )
  # define MNT_JSTICK_SPD_OPTION DISABLED // Allow RC joystick to control the speed of the mount movements instead of the position of the mount
- # define MNT_RETRACT_OPTION    DISABLED // Use a servo to retract the mount inside the fuselage (i.e. for landings)
- # define MNT_GPSPOINT_OPTION    ENABLED // Point the mount to a GPS point defined via a mouse click in the Mission Planner GUI
+ # define MNT_RETRACT_OPTION    ENABLED  // Use a servo to retract the mount inside the fuselage (i.e. for landings)
+ # define MNT_GPSPOINT_OPTION   ENABLED  // Point the mount to a GPS point defined via a mouse click in the Mission Planner GUI
  # define MNT_STABILIZE_OPTION  DISABLED // stabilize camera using frame attitude information
  # define MNT_MOUNT2_OPTION     DISABLED // second mount, can for example be used to keep an antenna pointed at the home position
 #else
  # define MNT_JSTICK_SPD_OPTION DISABLED // uses  844 bytes of memory
- # define MNT_RETRACT_OPTION    DISABLED // uses  244 bytes of memory
+ # define MNT_RETRACT_OPTION    ENABLED  // uses  244 bytes of memory
  # define MNT_GPSPOINT_OPTION   ENABLED  // uses  580 bytes of memory
- # define MNT_STABILIZE_OPTION  ENABLED  // uses 2424 bytes of memory
+ # define MNT_STABILIZE_OPTION  DISABLED // uses 2424 bytes of memory
  # define MNT_MOUNT2_OPTION     DISABLED // uses   58 bytes of memory (must also be enabled in APM_Config.h)
 #endif
 
@@ -108,7 +108,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
 #if MNT_STABILIZE_OPTION == ENABLED
     // @Param: STAB_ROLL
     // @DisplayName: Stabilize mount's roll angle
-    // @Description:enable roll stabilisation relative to Earth
+    // @Description: enable roll stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     AP_GROUPINFO("STAB_ROLL",  4, AP_Mount, _stab_roll, 0),

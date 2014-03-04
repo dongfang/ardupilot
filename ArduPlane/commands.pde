@@ -27,8 +27,8 @@ static void update_auto()
     if (g.command_index >= g.command_total) {
         handle_no_commands();
         if(g.command_total == 0) {
-            next_WP.lat             = home.lat + 1000;                  // so we don't have bad calcs
-            next_WP.lng             = home.lng + 1000;                  // so we don't have bad calcs
+            next_WP.lat             = home.lat + 10;
+            next_WP.lng             = home.lng + 10;
         }
     } else {
         if(g.command_index != 0) {
@@ -238,11 +238,7 @@ static void init_home()
 #endif
     }
 
-    home.id         = MAV_CMD_NAV_WAYPOINT;
-    home.lng        = g_gps->longitude;                                 // Lon * 10**7
-    home.lat        = g_gps->latitude;                                  // Lat * 10**7
-    // This is not so good if you fly in a depression where alt < 0.
-    home.alt        = max(g_gps->altitude_cm, 0);
+    ahrs.set_home(g_gps->latitude, g_gps->longitude, g_gps->altitude_cm);
     home_is_set = true;
 
     gcs_send_text_fmt(PSTR("gps alt: %lu"), (unsigned long)home.alt);
@@ -270,9 +266,7 @@ static void init_home()
 */
 static void update_home()
 {
-    home.lng        = g_gps->longitude;                                 // Lon * 10**7
-    home.lat        = g_gps->latitude;                                  // Lat * 10**7
-    home.alt        = max(g_gps->altitude_cm, 0);
+    ahrs.set_home(g_gps->latitude, g_gps->longitude, g_gps->altitude_cm);
     barometer.update_calibration();
 }
 

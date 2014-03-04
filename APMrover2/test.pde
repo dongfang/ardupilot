@@ -217,14 +217,14 @@ test_relay(uint8_t argc, const Menu::arg *argv)
 
 	while(1){
 		cliSerial->printf_P(PSTR("Relay on\n"));
-		relay.on();
+		relay.on(0);
 		delay(3000);
 		if(cliSerial->available() > 0){
 			return (0);
 		}
 
 		cliSerial->printf_P(PSTR("Relay off\n"));
-		relay.off();
+		relay.off(0);
 		delay(3000);
 		if(cliSerial->available() > 0){
 			return (0);
@@ -410,7 +410,7 @@ test_mag(uint8_t argc, const Menu::arg *argv)
                 // Calculate heading
                 Matrix3f m = ahrs.get_dcm_matrix();
                 heading = compass.calculate_heading(m);
-                compass.null_offsets();
+                compass.learn_offsets();
             }
             medium_loopCounter = 0;
         }

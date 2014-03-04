@@ -30,7 +30,7 @@ static void update_compass(void)
 {
     if (g.compass_enabled && compass.read()) {
         ahrs.set_compass(&compass);
-        compass.null_offsets();
+        compass.learn_offsets();
     } else {
         ahrs.set_compass(NULL);
     }
@@ -61,5 +61,7 @@ static void barometer_accumulate(void)
 static void update_GPS(void)
 {
     g_gps->update();
+    // REVISIT: add compass variation with compass.set_initial_location(g_gps->latitude, g_gps->longitude);
+    // when have a solid GPS fix. Also init_home();
 }
 
