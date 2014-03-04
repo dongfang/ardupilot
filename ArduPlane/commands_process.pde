@@ -35,6 +35,10 @@ void change_command(uint8_t cmd_index)
         } else {
             nav_command_index       = cmd_index;
         }
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/master
         g.command_index.set_and_save(cmd_index);
         update_commands();
     }

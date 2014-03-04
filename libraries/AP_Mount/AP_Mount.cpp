@@ -602,7 +602,9 @@ AP_Mount::stabilize()
         m = _ahrs.get_dcm_matrix();
         m.transpose();
         cam.from_euler(_roll_control_angle, _tilt_control_angle, _pan_control_angle);
+        // Combine control and attitude matrices.
         gimbal_target = m * cam;
+        // Get combined Euler angles
         gimbal_target.to_euler(&_roll_angle, &_tilt_angle, &_pan_angle);
         _roll_angle  = _stab_roll ? degrees(_roll_angle) : degrees(_roll_control_angle);
         _tilt_angle  = _stab_tilt ? degrees(_tilt_angle) : degrees(_tilt_control_angle);

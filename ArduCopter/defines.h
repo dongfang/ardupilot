@@ -15,7 +15,7 @@
 
 // Flight modes
 // ------------
-#define YAW_HOLD                        0       // heading hold at heading in nav_yaw but allow input from pilot
+#define YAW_HOLD                        0       // heading hold at heading in control_yaw but allow input from pilot
 #define YAW_ACRO                        1       // pilot controlled yaw using rate controller
 #define YAW_LOOK_AT_NEXT_WP             2       // point towards next waypoint (no pilot input accepted)
 #define YAW_LOOK_AT_LOCATION            3       // point towards a location held in yaw_look_at_WP (no pilot input accepted)
@@ -23,14 +23,14 @@
 #define YAW_LOOK_AT_HOME    		    5       // point towards home (no pilot input accepted)
 #define YAW_LOOK_AT_HEADING    		    6       // point towards a particular angle (not pilot input accepted)
 #define YAW_LOOK_AHEAD					7		// WARNING!  CODE IN DEVELOPMENT NOT PROVEN
-#define YAW_TOY                         8       // THOR This is the Yaw mode
+#define YAW_DRIFT                       8       //
 #define YAW_RESETTOARMEDYAW				9       // point towards heading at time motors were armed
 
 #define ROLL_PITCH_STABLE           0       // pilot input roll, pitch angles
 #define ROLL_PITCH_ACRO             1       // pilot inputs roll, pitch rotation rates in body frame
 #define ROLL_PITCH_AUTO             2       // no pilot input.  autopilot roll, pitch is sent to stabilize controller inputs
 #define ROLL_PITCH_STABLE_OF        3       // pilot inputs roll, pitch angles which are mixed with optical flow based position controller lean anbles
-#define ROLL_PITCH_TOY              4       // THOR This is the Roll and Pitch mode
+#define ROLL_PITCH_DRIFT            4       //
 #define ROLL_PITCH_LOITER           5       // pilot inputs the desired horizontal velocities
 #define ROLL_PITCH_SPORT            6       // pilot inputs roll, pitch rotation rates in earth frame
 #define ROLL_PITCH_AUTOTUNE         7       // description of new roll-pitch mode
@@ -40,6 +40,7 @@
 #define THROTTLE_HOLD                       2   // alt hold plus pilot input of climb rate
 #define THROTTLE_AUTO                       3   // auto pilot altitude controller with target altitude held in next_WP.alt
 #define THROTTLE_LAND                       4   // landing throttle controller
+#define THROTTLE_MANUAL_HELI                5   // pilot manually controlled throttle for traditional helicopters
 
 
 // sonar - for use with CONFIG_SONAR_SOURCE
@@ -86,6 +87,7 @@
 #define OCTA_FRAME 5
 #define HELI_FRAME 6
 #define OCTA_QUAD_FRAME 7
+#define SINGLE_FRAME 8
 
 #define PLUS_FRAME 0
 #define X_FRAME 1
@@ -144,10 +146,10 @@
 #define POSITION 8                      // AUTO control
 #define LAND 9                          // AUTO control
 #define OF_LOITER 10                    // Hold a single location using optical flow sensor
-#define TOY_A 11                        // THOR Enum for Toy mode
-#define TOY_M 12                        // THOR Enum for Toy mode
+#define DRIFT 11                        // DRIFT mode (Note: 12 is no longer used)
 #define SPORT 13                        // earth frame rate control
 #define NUM_MODES 14
+
 
 // CH_6 Tuning
 // -----------
@@ -205,13 +207,8 @@
 // Yaw behaviours during missions - possible values for WP_YAW_BEHAVIOR parameter
 #define WP_YAW_BEHAVIOR_NONE                          0   // auto pilot will never control yaw during missions or rtl (except for DO_CONDITIONAL_YAW command received)
 #define WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP               1   // auto pilot will face next waypoint or home during rtl
-#define WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP_EXCEPT_RTL    2   // auto pilot will face next waypoint except when doing RTL at which time it will stay in it's last 
+#define WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP_EXCEPT_RTL    2   // auto pilot will face next waypoint except when doing RTL at which time it will stay in it's last
 #define WP_YAW_BEHAVIOR_LOOK_AHEAD                    3   // auto pilot will look ahead during missions and rtl (primarily meant for traditional helicotpers)
-
-// TOY mixing options
-#define TOY_LOOKUP_TABLE 0
-#define TOY_LINEAR_MIXER 1
-#define TOY_EXTERNAL_MIXER 2
 
 
 // Waypoint options
@@ -259,6 +256,7 @@ enum ap_message {
     MSG_RAW_IMU2,
     MSG_RAW_IMU3,
     MSG_GPS_RAW,
+    MSG_SYSTEM_TIME,
     MSG_SERVO_OUT,
     MSG_NEXT_WAYPOINT,
     MSG_NEXT_PARAM,
@@ -281,7 +279,6 @@ enum ap_message {
 #define LOG_CMD_MSG                     0x08
 #define LOG_CURRENT_MSG                 0x09
 #define LOG_STARTUP_MSG                 0x0A
-#define LOG_MOTORS_MSG                  0x0B
 #define LOG_OPTFLOW_MSG                 0x0C
 #define LOG_EVENT_MSG                   0x0D
 #define LOG_PID_MSG                     0x0E
@@ -305,11 +302,11 @@ enum ap_message {
 #define MASK_LOG_PM                     (1<<3)
 #define MASK_LOG_CTUN                   (1<<4)
 #define MASK_LOG_NTUN                   (1<<5)
-#define MASK_LOG_MODE                   (1<<6)  // not used
+#define MASK_LOG_RCIN                   (1<<6)
 #define MASK_LOG_IMU                    (1<<7)
 #define MASK_LOG_CMD                    (1<<8)
 #define MASK_LOG_CURRENT                (1<<9)
-#define MASK_LOG_MOTORS                 (1<<10)
+#define MASK_LOG_RCOUT                  (1<<10)
 #define MASK_LOG_OPTFLOW                (1<<11)
 #define MASK_LOG_PID                    (1<<12)
 #define MASK_LOG_COMPASS                (1<<13)
@@ -345,6 +342,14 @@ enum ap_message {
 #define DATA_AUTOTUNE_REACHED_LIMIT     35
 #define DATA_AUTOTUNE_TESTING           36
 #define DATA_AUTOTUNE_SAVEDGAINS        37
+#define DATA_SAVE_TRIM                  38
+#define DATA_SAVEWP_ADD_WP              39
+#define DATA_SAVEWP_CLEAR_MISSION_RTL   40
+#define DATA_FENCE_ENABLE               41
+#define DATA_FENCE_DISABLE              42
+#define DATA_ACRO_TRAINER_DISABLED      43
+#define DATA_ACRO_TRAINER_LEVELING      44
+#define DATA_ACRO_TRAINER_LIMITED       45
 
 
 
@@ -389,8 +394,6 @@ enum ap_message {
 
 #define RELAY_APM1_PIN 47
 #define RELAY_APM2_PIN 13
-
-#define PIEZO_PIN AN5           //Last pin on the back ADC connector
 
 // RADIANS
 #define RADX100 0.000174532925f
@@ -444,6 +447,7 @@ enum ap_message {
 #define ERROR_SUBSYSTEM_FAILSAFE_FENCE      9
 #define ERROR_SUBSYSTEM_FLIGHT_MODE         10
 #define ERROR_SUBSYSTEM_GPS                 11
+#define ERROR_SUBSYSTEM_CRASH_CHECK         12
 // general error codes
 #define ERROR_CODE_ERROR_RESOLVED           0
 #define ERROR_CODE_FAILED_TO_INITIALISE     1
@@ -457,8 +461,36 @@ enum ap_message {
 // subsystem specific error codes -- gps
 #define ERROR_CODE_GPS_GLITCH               2
 // subsystem specific error codes -- main
-#define ERROR_CODE_INS_DELAY                1
+#define ERROR_CODE_MAIN_INS_DELAY           1
+// subsystem specific error codes -- crash checker
+#define ERROR_CODE_CRASH_CHECK_CRASH        1
 
+// Arming Check Enable/Disable bits
+#define ARMING_CHECK_NONE                   0x00
+#define ARMING_CHECK_ALL                    0x01
+#define ARMING_CHECK_BARO                   0x02
+#define ARMING_CHECK_COMPASS                0x04
+#define ARMING_CHECK_GPS                    0x08
+#define ARMING_CHECK_INS                    0x10
+#define ARMING_CHECK_PARAMETERS             0x20
+#define ARMING_CHECK_RC                     0x40
+#define ARMING_CHECK_VOLTAGE                0x80
 
+// Radio failsafe definitions (FS_THR parameter)
+#define FS_THR_DISABLED                    0
+#define FS_THR_ENABLED_ALWAYS_RTL          1
+#define FS_THR_ENABLED_CONTINUE_MISSION    2
+#define FS_THR_ENABLED_ALWAYS_LAND         3
+
+// Battery failsafe definitions (FS_BATT_ENABLE parameter)
+#define FS_BATT_DISABLED                    0       // battery failsafe disabled
+#define FS_BATT_LAND                        1       // switch to LAND mode on battery failsafe
+#define FS_BATT_RTL                         2       // switch to RTL mode on battery failsafe
+
+// GPS Failsafe definitions (FS_GPS_ENABLE parameter)
+#define FS_GPS_DISABLED                     0       // GPS failsafe disabled
+#define FS_GPS_LAND                         1       // switch to LAND mode on GPS Failsafe
+#define FS_GPS_ALTHOLD                      2       // switch to ALTHOLD mode on GPS failsafe
+#define FS_GPS_LAND_EVEN_STABILIZE          3       // switch to LAND mode on GPS failsafe even if in a manual flight mode like Stabilize
 
 #endif // _DEFINES_H

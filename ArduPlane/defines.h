@@ -130,6 +130,7 @@ enum ap_message {
     MSG_RAW_IMU2,
     MSG_RAW_IMU3,
     MSG_GPS_RAW,
+    MSG_SYSTEM_TIME,
     MSG_SERVO_OUT,
     MSG_NEXT_WAYPOINT,
     MSG_NEXT_PARAM,
@@ -139,6 +140,7 @@ enum ap_message {
     MSG_SIMSTATE,
     MSG_HWSTATUS,
     MSG_WIND,
+    MSG_RANGEFINDER,
     MSG_RETRY_DEFERRED // this must be last
 };
 
@@ -160,6 +162,8 @@ enum log_messages {
     LOG_MODE_MSG,
     LOG_COMPASS_MSG,
     LOG_TECS_MSG,
+    LOG_RC_MSG,
+    LOG_SONAR_MSG,
     MAX_NUM_LOGS // always at the end
 };
 
@@ -176,6 +180,8 @@ enum log_messages {
 #define MASK_LOG_COMPASS                (1<<10)
 #define MASK_LOG_TECS                   (1<<11)
 #define MASK_LOG_CAMERA                 (1<<12)
+#define MASK_LOG_RC                     (1<<13)
+#define MASK_LOG_SONAR                  (1<<14)
 
 // Waypoint Modes
 // ----------------

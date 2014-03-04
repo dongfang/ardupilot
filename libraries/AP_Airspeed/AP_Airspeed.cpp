@@ -32,7 +32,7 @@ extern const AP_HAL::HAL& hal;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
  #define ARSPD_DEFAULT_PIN 0
 #elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
- #define ARSPD_DEFAULT_PIN 0
+ #define ARSPD_DEFAULT_PIN 1
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
  #include <sys/stat.h>
  #include <sys/types.h>
@@ -170,6 +170,7 @@ void AP_Airspeed::read(void)
     }
     airspeed_pressure       = get_pressure();
     airspeed_pressure       = max(airspeed_pressure - _offset, 0);
+    _last_pressure          = airspeed_pressure;
     _raw_airspeed           = sqrtf(airspeed_pressure * _ratio);
     _airspeed               = 0.7f * _airspeed  +  0.3f * _raw_airspeed;
 }
