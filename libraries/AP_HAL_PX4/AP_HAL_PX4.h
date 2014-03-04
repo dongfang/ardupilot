@@ -1,16 +1,3 @@
-<<<<<<< HEAD
-
-#ifndef __AP_HAL_PX4_H__
-#define __AP_HAL_PX4_H__
-
-#include <AP_HAL.h>
-#include "HAL_PX4_Class.h"
-#include "AP_HAL_PX4_Main.h"
-
-#endif // __AP_HAL_PX4_H__
-
-=======
-
 #ifndef __AP_HAL_PX4_H__
 #define __AP_HAL_PX4_H__
 
@@ -23,4 +10,3 @@
 #endif // CONFIG_HAL_BOARD
 #endif // __AP_HAL_PX4_H__
 
->>>>>>> upstream/master

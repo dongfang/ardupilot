@@ -543,8 +543,6 @@ set_servos_4()
 #endif
     motors.output();
 }
-<<<<<<< HEAD
-=======
 
 // servo_write - writes to a servo after checking the channel is not used for a motor
 static void servo_write(uint8_t ch, uint16_t pwm)
@@ -576,4 +574,3 @@ static void servo_write(uint8_t ch, uint16_t pwm)
         hal.rcout->write(ch, pwm);
     }
 }
->>>>>>> upstream/master
