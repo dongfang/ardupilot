@@ -1,0 +1,158 @@
+RC_Channel.h
+
+has 3 different type options:
+RC_CHANNEL_TYPE_ANGLE
+RC_CHANNEL_TYPE_RANGE
+RC_CHANNEL_TYPE_ANGLE_RAW
+
+In ArduPlane, RC_CHANNEL_TYPE_ANGLE and RC_CHANNEL_TYPE_RANGE are used, as can be seen in radio.pde.
+    // set rc channel ranges
+    g.channel_roll.set_angle(SERVO_MAX);
+    g.channel_pitch.set_angle(SERVO_MAX);
+    g.channel_rudder.set_angle(SERVO_MAX);
+    g.channel_throttle.set_range(0, 100);
+
+    // set rc dead zones
+    g.channel_roll.set_dead_zone(60);
+    g.channel_pitch.set_dead_zone(60);
+    g.channel_rudder.set_dead_zone(60);
+    g.channel_throttle.set_dead_zone(6);
+
+
+RC_Channel has the state properties:
+    int16_t         control_in;		// Internal input value.
+    int16_t         servo_out;		// Internal output value.
+
+    int16_t         radio_in;		// Raw PWM microsecs value.
+    int16_t         pwm_out;			// PWM output without radio_min offset and with internal sign. Appears pretty useless and is not used from outside.
+    int16_t         radio_out;		// PWM output with reversal and radio offsets applied.
+
+    AP_Int16        radio_min;		// Radio range low.
+    AP_Int16        radio_trim;		// Radio range neutral value.
+    AP_Int16        radio_max;		// Radio range high.
+
+and the private configuration properties:
+    AP_Int8         _reverse;		// Will reverse internal wrt. input.
+    AP_Int16        _dead_zone;		// Input closer than this to trim value is considered zero.
+    uint8_t         _type;			// RC_CHANNEL_TYPE...
+    int16_t         _high; 			// Internal range high. For ANGLE type this stores the angle range.
+    int16_t         _low;			// Internal input range low.
+    int16_t         _high_out;		// Internal output range high.
+    int16_t         _low_out;		// Internal output range low.
+    uint8_t         _ch_out;			// Number of this channel.
+ 
+
+HAL interfaces are:
+void RC_Channel::output()
+{
+    hal.rcout->write(_ch_out, radio_out);
+}
+
+void
+RC_Channel::input()
+{
+    radio_in = hal.rcin->read(_ch_out);
+}
+
+void
+RC_Channel::enable_out()
+
+    
+
+Non obvious methods are:
+void
+RC_Channel::set_pwm(int16_t pwm)
+{
+    radio_in = pwm;
+
+    if(_type == RC_CHANNEL_TYPE_RANGE) {
+        control_in = pwm_to_range();
+        control_in = (control_in < _dead_zone) ? 0 : control_in;
+    } else {
+        //RC_CHANNEL_TYPE_ANGLE, RC_CHANNEL_TYPE_ANGLE_RAW
+        control_in = pwm_to_angle();
+    }
+}
+which does input.
+
+pwm_to_range() forwards to
+int16_t
+RC_Channel::pwm_to_range_dz(uint16_t dead_zone)
+{
+    int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
+
+    if (_reverse == -1) {
+	    r_in = radio_max.get() - (r_in - radio_min.get());
+    }
+
+    int16_t radio_trim_low  = radio_min + dead_zone;
+
+    if (r_in > radio_trim_low)
+        return (_low + ((long)(_high - _low) * (long)(r_in - radio_trim_low)) / (long)(radio_max - radio_trim_low));
+    else if (dead_zone > 0)
+        return 0;
+    else
+        return _low;
+}
+
+Converts an input range (PWM) value to internal range.
+
+int16_t
+RC_Channel::control_mix(float value)
+{
+    return (1 - abs(control_in / _high)) * value + control_in;
+}
+Adds 0..1*value to contol_in, depending on control_in.
+Nobody uses it.
+
+Output side!
+void
+RC_Channel::calc_pwm(void)
+{
+    if(_type == RC_CHANNEL_TYPE_RANGE) {
+        pwm_out         = range_to_pwm();
+        radio_out       = (_reverse >= 0) ? (radio_min + pwm_out) : (radio_max - pwm_out);
+
+    } else if(_type == RC_CHANNEL_TYPE_ANGLE_RAW) {
+        pwm_out         = (float)servo_out * 0.1f;
+        radio_out       = (pwm_out * _reverse) + radio_trim;
+
+    } else {     // RC_CHANNEL_TYPE_ANGLE
+        pwm_out         = angle_to_pwm();
+        radio_out       = pwm_out + radio_trim;
+    }
+
+    radio_out = constrain_int16(radio_out, radio_min.get(), radio_max.get());
+}
+Calculates pwm_out and radio_out from servo_out.
+
+int16_t
+RC_Channel::range_to_pwm()
+{
+    return ((long)(servo_out - low_out) * (long)(radio_max - radio_min)) / (long)(_high_out - _low_out);
+}
+Converts "out" range to "radio" range. However the result is not signed nor offset and may be zero.
+
+int16_t
+RC_Channel::angle_to_pwm()
+{
+    if((servo_out * _reverse) > 0)
+        return _reverse * ((long)servo_out * (long)(radio_max - radio_trim)) / (long)_high;
+    else
+        return _reverse * ((long)servo_out * (long)(radio_trim - radio_min)) / (long)_high;
+}
+Caclulates a signed(!) value. Converts angular scale to radio. When servo_out == _high, there will be full deflection (radio_min or radio_max) depending on _reverse.
+
+float
+RC_Channel::norm_input()
+Converts radio_in to a value in a [-1..1] range. This is actually used a from few places.
+
+float
+RC_Channel::norm_output()
+Converts radio_in to a value in a [-1..1] range. This is used for HIL mode.
+
+
+
+Auxiliary RC channels have a function assigned, eg. flaps.
+
+

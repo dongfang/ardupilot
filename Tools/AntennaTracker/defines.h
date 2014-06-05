@@ -50,5 +50,16 @@
 #define MASK_OPTIONS_LOITER_DIRECTION   (1<<2)          // 0 = CW
                                                         // 1 = CCW
 
+// Controller modes
+// ----------------
+
+enum ControlMode {
+    MANUAL=0,
+    STOP=1,
+    SCAN=2,
+    AUTO=10,
+    INITIALISING=16
+};
+
 #endif // _DEFINES_H
 

@@ -16,11 +16,13 @@ static bool land_init(bool ignore_checks)
         wp_nav.set_loiter_target(stopping_point);
     }
 
-    // initialise filters on roll/pitch input
-    reset_roll_pitch_in_filters(g.rc_1.control_in, g.rc_2.control_in);
+    // initialize vertical speeds and leash lengths
+    pos_control.set_speed_z(wp_nav.get_speed_down(), wp_nav.get_speed_up());
+    pos_control.set_accel_z(wp_nav.get_accel_z());
 
     // initialise altitude target to stopping point
     pos_control.set_target_to_stopping_point_z();
+
     return true;
 }
 
@@ -129,7 +131,7 @@ static void land_nogps_run()
     }
 
     // call attitude controller
-    attitude_control.angle_ef_roll_pitch_rate_ef_yaw(target_roll, target_pitch, target_yaw_rate);
+    attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(target_roll, target_pitch, target_yaw_rate, get_smoothing_gain());
 
     // call position controller
     pos_control.set_alt_target_from_climb_rate(get_throttle_land(), G_Dt);
@@ -147,13 +149,6 @@ static float get_throttle_land()
     }else{
         return -abs(g.land_speed);
     }
-}
-
-// reset_land_detector - initialises land detector
-static void reset_land_detector()
-{
-    set_land_complete(false);
-    land_detector = 0;
 }
 
 // update_land_detector - checks if we have landed and updates the ap.land_complete flag
@@ -181,4 +176,12 @@ static bool update_land_detector()
 
     // return current state of landing
     return ap.land_complete;
+}
+
+// land_do_not_use_GPS - forces land-mode to not use the GPS but instead rely on pilot input for roll and pitch
+//  called during GPS failsafe to ensure that if we were already in LAND mode that we do not use the GPS
+//  has no effect if we are not already in LAND mode
+static void land_do_not_use_GPS()
+{
+    land_with_gps = false;
 }

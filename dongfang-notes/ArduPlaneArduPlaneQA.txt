@@ -1,0 +1,241 @@
+1) When is home position set? Home altitude?
+Answer part1: Upon MAVLink MAV_CMD_DO_SET_HOME command.
+If p1 in the command is 1, then onboard GPS is used, else location is taken from command.
+If you are below sea level (that is perfectly possible some places) then home alt. is set
+to sea level.
+Implementation in commands_logic.pde:
+static void do_set_home()
+{
+    if (next_nonnav_command.p1 == 1 && g_gps->status() == GPS::GPS_OK) {
+        init_home();
+    } else {
+        home.id         = MAV_CMD_NAV_WAYPOINT;
+        home.lng        = next_nonnav_command.lng;                                      // Lon * 10**7
+        home.lat        = next_nonnav_command.lat;                                      // Lat * 10**7
+        home.alt        = max(next_nonnav_command.alt, 0);
+        home_is_set = true;
+    }
+}
+called (only) from handle_process_do_command:
+    case MAV_CMD_DO_SET_HOME:
+        do_set_home();
+     break;
+
+Answer part 2:
+void init_home()
+{
+    gcs_send_text_P(SEVERITY_LOW, PSTR("init home"));
+
+    // block until we get a good fix
+    // -----------------------------
+    while (!g_gps->new_data || !g_gps->fix) {
+        g_gps->update();
+#if HIL_MODE != HIL_MODE_DISABLED
+        // update hil gps so we have new_data
+        gcs_update();
+#endif
+    }
+
+    home.id         = MAV_CMD_NAV_WAYPOINT;
+    home.lng        = g_gps->longitude;                                 // Lon * 10**7
+    home.lat        = g_gps->latitude;                                  // Lat * 10**7
+    home.alt        = max(g_gps->altitude, 0);
+    home_is_set = true;
+
+    gcs_send_text_fmt(PSTR("gps alt: %lu"), (unsigned long)home.alt);
+
+    // Save Home to EEPROM - Command 0
+    // -------------------
+    set_cmd_with_index(home, 0);
+
+    // Save prev loc
+    // -------------
+    next_WP = prev_WP = home;
+
+    // Load home for a default guided_WP
+    // -------------
+    guided_WP = home;
+    guided_WP.alt += g.RTL_altitude_cm;
+}
+init_home() blocks until GPS has a fix and sets home, even sets prev. and next WP.
+init_home() is called from above MAVLink command handler, and from update_GPS().
+The counter ground_start_count takes care that at least 4 good fixes have been had before GPS fix is adopted.
+
+
+
+
+2) When and how is the altimeter calibrated? Why do I have an error?
+
+
+
+3) How does failsafe really work?
+There is the state: (ArduPlane.pde):
+static int16_t failsafe;
+// Used to track if the value on channel 3 (throttle) has fallen below the failsafe threshold
+// RC receiver should be set up to output a low throttle value when signal is lost
+static bool ch3_failsafe;
+// the time when the last HEARTBEAT message arrived from a GCS
+static uint32_t last_heartbeat_ms;
+// A timer used to track how long we have been in a "short failsafe" condition due to loss of RC signal
+static uint32_t ch3_failsafe_timer = 0;
+
+and in radio.pde:
+// we wait a second to take over the throttle and send the plane circling
+static uint8_t failsafeCounter = 0;
+
+
+from slow_loop, check_long_failsafe is called (3.33 Hz).
+
+From fast_loop()->radio_read() this is called (with throttle channel as input):
+It updates ch3_failsafe:
+static void control_failsafe(uint16_t pwm)
+{
+    if(g.throttle_fs_enabled == 0)
+        return;
+
+    // Check for failsafe condition based on loss of GCS control
+    if (rc_override_active) {
+        if (millis() - last_heartbeat_ms > FAILSAFE_SHORT_TIME) {
+            ch3_failsafe = true;
+        } else {
+            ch3_failsafe = false;			// Here it is re-triggered every run of this.
+        }
+
+        //Check for failsafe and debounce funky reads
+    } else if (g.throttle_fs_enabled) {
+        if (pwm < (unsigned)g.throttle_fs_value) {
+            // we detect a failsafe from radio
+            // throttle has dropped below the mark
+            failsafeCounter++;
+            if (failsafeCounter == 9) {
+                gcs_send_text_fmt(PSTR("MSG FS ON %u"), (unsigned)pwm);
+            }else if(failsafeCounter == 10) {
+                ch3_failsafe = true;
+            }else if (failsafeCounter > 10) { // make a one-shot triggering at 10.
+                failsafeCounter = 11;
+            }
+
+        }else if(failsafeCounter > 0) {
+            // we are no longer in failsafe condition
+            // but we need to recover quickly
+            failsafeCounter--;
+            if (failsafeCounter > 3) {
+                failsafeCounter = 3;
+            }
+            if (failsafeCounter == 1) {
+                gcs_send_text_fmt(PSTR("MSG FS OFF %u"), (unsigned)pwm);
+            } else if(failsafeCounter == 0) {
+                ch3_failsafe = false;
+            }
+        }
+    }
+}
+
+From fast_loop, 
+check_short_failsafe is called (50 Hz). It fires failsafe_short_on/off_event once
+after ch3_failsafe has changed:
+static void check_short_failsafe()
+{
+    // only act on changes
+    // -------------------
+    if(failsafe == FAILSAFE_NONE) {
+        if(ch3_failsafe) {                                              // The condition is checked and the flag ch3_failsafe is set in radio.pde
+            failsafe_short_on_event(FAILSAFE_SHORT);
+        }
+    }
+
+    if(failsafe == FAILSAFE_SHORT) {
+        if(!ch3_failsafe) {
+            failsafe_short_off_event();
+        }
+    }
+}
+
+and failsafe_short_on_event() saves the new failsafe value into failsafe variable and transforms
+manual control modes into CIRCLE and (if enabled) auto control modes into RTL:
+static void failsafe_short_on_event(int16_t fstype)
+{
+    // This is how to handle a short loss of control signal failsafe.
+    failsafe = fstype;
+    ch3_failsafe_timer = millis();
+    gcs_send_text_P(SEVERITY_LOW, PSTR("Failsafe - Short event on, "));
+    switch(control_mode)
+    {
+    case MANUAL:
+    case STABILIZE:
+    case FLY_BY_WIRE_A:
+    case FLY_BY_WIRE_B:
+    case TRAINING:
+        set_mode(CIRCLE);
+        break;
+
+    case AUTO:
+    case GUIDED:
+    case LOITER:
+        if(g.short_fs_action == 1) {
+            set_mode(RTL);
+        }
+        break;
+
+    case CIRCLE:
+    case RTL:
+    default:
+        break;
+    }
+    gcs_send_text_fmt(PSTR("flight mode = %u"), (unsigned)control_mode);
+}
+
+
+
+Transforms failsafe after long enough time has elapsed:
+FAILSAFE_NONE or FAILSAFE_SHORT -> 
+  if failsafe or last-heartbeat timer is too old (depending on rc_override_active) go FAILSAFE_LONG.
+  if heartbeat failsafe is enabled and no heartbeat received for some time, go FAILSAFE_GCS
+
+FAILSAFE_LONG or FAILSAFE_GCS ->
+  failsafe variable manipulated directly. Is that good?
+static void check_long_failsafe()
+{
+    uint32_t tnow = millis();
+    // only act on changes
+    // -------------------
+    if(failsafe != FAILSAFE_LONG  && failsafe != FAILSAFE_GCS) {
+        if (rc_override_active && tnow - last_heartbeat_ms > FAILSAFE_LONG_TIME) {
+            failsafe_long_on_event(FAILSAFE_LONG);
+        }
+        if(!rc_override_active && failsafe == FAILSAFE_SHORT && 
+           (tnow - ch3_failsafe_timer) > FAILSAFE_LONG_TIME) {
+            failsafe_long_on_event(FAILSAFE_LONG);
+        }
+        if (g.gcs_heartbeat_fs_enabled && 
+            last_heartbeat_ms != 0 &&
+            (tnow - last_heartbeat_ms) > FAILSAFE_LONG_TIME) {
+            failsafe_long_on_event(FAILSAFE_GCS);
+        }
+    } else {
+        // We do not change state but allow for user to change mode
+        if (failsafe == FAILSAFE_GCS && 
+            (tnow - last_heartbeat_ms) < FAILSAFE_SHORT_TIME) 
+            failsafe = FAILSAFE_NONE;
+        if (failsafe == FAILSAFE_LONG && rc_override_active && 
+            (tnow - last_heartbeat_ms) < FAILSAFE_SHORT_TIME) 
+            failsafe = FAILSAFE_NONE;
+        if (failsafe == FAILSAFE_LONG && !rc_override_active && !ch3_failsafe) 
+            failsafe = FAILSAFE_NONE;
+    }
+}
+
+
+
+
+Failsafe improvement suggestions:
+1) Allow any channel to be used for detection instead of just throttle. One could also
+   implement this heartbeat channel proposal.
+2) In short action it should be possible to disable CIRCLE. There is room for more flexibility.
+3) We might as well have a longer time with a signal to recover from failsafe. It is very short
+   now.
+
+
+4) Under which circumstances is a mission restarted?
+  1) Manually with the g.reset_switch_chan parameter (index of a radio channel)
+  

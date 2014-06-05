@@ -35,6 +35,7 @@
 #include <AP_Motors.h>          // Motor library
 #include <DataFlash.h>
 #include <GCS_MAVLink.h>
+#include <AP_Mission.h>
 
 const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 
@@ -52,15 +53,14 @@ AP_Baro_BMP085 baro;
 #endif
 
 // GPS declaration
-GPS *gps;
-AP_GPS_Auto auto_gps(&gps);
+AP_GPS gps;
 GPS_Glitch gps_glitch(gps);
 
 AP_Compass_HMC5843 compass;
 AP_AHRS_DCM ahrs(ins, baro, gps);
 
 // Inertial Nav declaration
-AP_InertialNav inertialnav(ahrs, baro, gps, gps_glitch);
+AP_InertialNav inertialnav(ahrs, baro, gps_glitch);
 
 void setup()
 {

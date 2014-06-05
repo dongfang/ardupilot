@@ -192,11 +192,13 @@ static bool autotune_init(bool ignore_checks)
         return false;
     }
 
-    // initialise filters on roll/pitch input
-    reset_roll_pitch_in_filters(g.rc_1.control_in, g.rc_2.control_in);
+    // initialize vertical speeds and leash lengths
+    pos_control.set_speed_z(-g.pilot_velocity_z_max, g.pilot_velocity_z_max);
+    pos_control.set_accel_z(g.pilot_accel_z);
 
     // initialise altitude target to stopping point
     pos_control.set_target_to_stopping_point_z();
+
     return true;
 }
 
@@ -264,7 +266,7 @@ static void autotune_run()
 
         // if pilot override call attitude controller
         if (autotune_state.pilot_override || autotune_state.mode != AUTOTUNE_MODE_TUNING) {
-            attitude_control.angle_ef_roll_pitch_rate_ef_yaw(target_roll, target_pitch, target_yaw_rate);
+            attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(target_roll, target_pitch, target_yaw_rate, get_smoothing_gain());
         }else{
             // somehow get attitude requests from autotuning
             autotune_attitude_control();

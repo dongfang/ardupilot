@@ -250,7 +250,7 @@ void AP_MotorsMatrix::output_armed()
         thr_adj = _rc_throttle.radio_out - out_best_thr_pwm;
 
         // calc upper and lower limits of thr_adj
-        int16_t thr_adj_max = out_max_pwm-(out_best_thr_pwm+rpy_high);
+        int16_t thr_adj_max = max(out_max_pwm-(out_best_thr_pwm+rpy_high),0);
 
         // if we are increasing the throttle (situation #2 above)..
         if (thr_adj > 0) {
@@ -329,43 +329,23 @@ void AP_MotorsMatrix::output_disarmed()
     output_min();
 }
 
-// output_test - spin each motor for a moment to allow the user to confirm the motor order and spin direction
-void AP_MotorsMatrix::output_test()
+// output_test - spin a motor at the pwm value specified
+//  motor_seq is the motor's sequence number from 1 to the number of motors on the frame
+//  pwm value is an actual pwm value that will be output, normally in the range of 1000 ~ 2000
+void AP_MotorsMatrix::output_test(uint8_t motor_seq, int16_t pwm)
 {
-    uint8_t min_order, max_order;
-    uint8_t i,j;
-
-    // find min and max orders
-    min_order = _test_order[0];
-    max_order = _test_order[0];
-    for(i=1; i<AP_MOTORS_MAX_NUM_MOTORS; i++ ) {
-        if( _test_order[i] < min_order )
-            min_order = _test_order[i];
-        if( _test_order[i] > max_order )
-            max_order = _test_order[i];
+    // exit immediately if not armed
+    if (!_flags.armed) {
+        return;
     }
-
-    // shut down all motors
-    output_min();
-
-    // first delay is longer
-    hal.scheduler->delay(4000);
 
     // loop through all the possible orders spinning any motors that match that description
-    for( i=min_order; i<=max_order; i++ ) {
-        for( j=0; j<AP_MOTORS_MAX_NUM_MOTORS; j++ ) {
-            if( motor_enabled[j] && _test_order[j] == i ) {
-                // turn on this motor and wait 1/3rd of a second
-                hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[j]), _rc_throttle.radio_min + _min_throttle);
-                hal.scheduler->delay(300);
-                hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[j]), _rc_throttle.radio_min);
-                hal.scheduler->delay(2000);
-            }
+    for (uint8_t i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++) {
+        if (motor_enabled[i] && _test_order[i] == motor_seq) {
+            // turn on this motor
+            hal.rcout->write(pgm_read_byte(&_motor_to_channel_map[i]), pwm);
         }
     }
-
-    // shut down all motors
-    output_min();
 }
 
 // add_motor

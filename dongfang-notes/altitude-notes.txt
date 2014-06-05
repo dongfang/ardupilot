@@ -1,0 +1,34 @@
+Altitudes and velocities in ArduPlane and ArduCopter MAVLink messages
+=====================================================================
+Soren Kuula
+
+GLOBAL_POSITION_INT:
+	alt = g_gps->altitude (to mm)
+	relative_alt = relative_altitude() to mm (= current_loc.alt - home.alt)
+	vx, vy, vz = velocity vector components from g_gps
+
+Problem: ArduPlane and ArduCopter fly and navigate by current_loc.alt. This is an MSL altitude like g_gps->altitude but it may be derived from GPS and baro info together (smoother) and may not be equal to g_gps->altitude (GPS altitude inaccuracy).
+alt and relative_alt are thus not directly comparable, and the difference between the two (which should be the home altitude) may vary over time (within bounds given by GPS accuracy).
+Since the raw GPS altitude g_gps->altitude is a) noisy and not so useful and b) available for diagnostics etc. in the GPS_RAW message, I suggest using current_location.alt instead of g_gps->altitude in the GLOBAL_POSITION_INT message.
+
+GPS_RAW:
+	g_gps->altitude (to mm) 
+	g_gps->ground_speed (to cm/s)
+	g_gps->ground_course (to centidegrees)
+
+VFR_HUD:
+	airspeed = 
+		Plane: Pure airspeed if enabled or else an estimate. If estimation fails, 0.
+	       	Copter: GPS groundspeed.
+	alt = current_loc.alt / 100 (in meters float)
+	climb = climb rate is barometric
+	groundspeed = g_gps->ground_speed (in m/s float)
+
+
+
+
+NAV_CONTROLLER is useful, contains xtrack error, wp distance, nav and target bearing etc.
+
+RAW_IMU2 has pressure and pressure minus init-pressure. Also has temperature.
+
+RAW_IMU3 has "raw" pressure and "raw" temperature (unscaled sensor readings).

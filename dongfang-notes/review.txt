@@ -1,0 +1,17 @@
+1) This is applied AFTER stibilize_stick_mixing_fbw:
+static void stabilize_roll(float speed_scaler)
+{
+    if (crash_timer > 0) {
+        nav_roll_cd = 0;
+    }
+
+That means, if crash_timer is nonzero, stick mixing gets killed.
+
+
+2) nav_pitch_cd, nav_roll_cd: These are not really particularly nav related but more stabilization. Rename them?
+
+3) attitude.pde, stabilize_stick_mixing_direct()
+   Should PwM-domain values really be used outside RC_Channel? Was the purpose on RC_Channel t0
+   conceal physical PWM stuff and translate it to abstract intervals for flight control?
+   
+    

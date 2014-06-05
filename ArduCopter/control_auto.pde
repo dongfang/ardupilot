@@ -20,14 +20,18 @@
 // auto_init - initialise auto controller
 static bool auto_init(bool ignore_checks)
 {
-    if ((GPS_ok() && inertial_nav.position_ok() && g.command_total > 1) || ignore_checks) {
+    if ((GPS_ok() && inertial_nav.position_ok() && mission.num_commands() > 1) || ignore_checks) {
         // stop ROI from carrying over from previous runs of the mission
         // To-Do: reset the yaw as part of auto_wp_start when the previous command was not a wp command to remove the need for this special ROI check
         if (auto_yaw_mode == AUTO_YAW_ROI) {
             set_auto_yaw_mode(AUTO_YAW_HOLD);
         }
-        // clear the command queues. will be reloaded when "run_autopilot" calls "update_commands" function
-        init_commands();
+
+        // initialise waypoint and spline controller
+        wp_nav.wp_and_spline_init();
+
+        // start/resume the mission (based on MIS_RESTART parameter)
+        mission.start_or_resume();
         return true;
     }else{
         return false;
@@ -47,6 +51,7 @@ static void auto_run()
         break;
 
     case Auto_WP:
+    case Auto_CircleMoveToEdge:
         auto_wp_run();
         break;
 
@@ -60,6 +65,10 @@ static void auto_run()
 
     case Auto_Circle:
         auto_circle_run();
+        break;
+
+    case Auto_Spline:
+        auto_spline_run();
         break;
     }
 }
@@ -169,6 +178,63 @@ static void auto_wp_run()
     }
 }
 
+// auto_spline_start - initialises waypoint controller to implement flying to a particular destination using the spline controller
+//  seg_end_type can be SEGMENT_END_STOP, SEGMENT_END_STRAIGHT or SEGMENT_END_SPLINE.  If Straight or Spline the next_destination should be provided
+static void auto_spline_start(const Vector3f& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Vector3f& next_destination)
+{
+    auto_mode = Auto_Spline;
+
+    // initialise wpnav
+    wp_nav.set_spline_destination(destination, stopped_at_start, seg_end_type, next_destination);
+
+    // initialise yaw
+    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
+    if (auto_yaw_mode != AUTO_YAW_ROI) {
+        set_auto_yaw_mode(get_default_auto_yaw_mode(false));
+    }
+}
+
+// auto_spline_run - runs the auto spline controller
+//      called by auto_run at 100hz or more
+static void auto_spline_run()
+{
+    // if not auto armed set throttle to zero and exit immediately
+    if(!ap.auto_armed) {
+        // To-Do: reset waypoint origin to current location because copter is probably on the ground so we don't want it lurching left or right on take-off
+        //    (of course it would be better if people just used take-off)
+        attitude_control.init_targets();
+        attitude_control.set_throttle_out(0, false);
+        // tell motors to do a slow start
+        motors.slow_start(true);
+        return;
+    }
+
+    // process pilot's yaw input
+    float target_yaw_rate = 0;
+    if (!failsafe.radio) {
+        // get pilot's desired yaw rate
+        target_yaw_rate = get_pilot_desired_yaw_rate(g.rc_4.control_in);
+        if (target_yaw_rate != 0) {
+            set_auto_yaw_mode(AUTO_YAW_HOLD);
+        }
+    }
+
+    // run waypoint controller
+    wp_nav.update_spline();
+
+    // call z-axis position controller (wpnav should have already updated it's alt target)
+    pos_control.update_z_controller();
+
+    // call attitude controller
+    if (auto_yaw_mode == AUTO_YAW_HOLD) {
+        // roll & pitch from waypoint controller, yaw rate from pilot
+        attitude_control.angle_ef_roll_pitch_rate_ef_yaw(wp_nav.get_roll(), wp_nav.get_pitch(), target_yaw_rate);
+    }else{
+        // roll, pitch from waypoint controller, yaw heading from auto_heading()
+        attitude_control.angle_ef_roll_pitch_yaw(wp_nav.get_roll(), wp_nav.get_pitch(), get_auto_heading(), true);
+    }
+}
+
 // auto_land_start - initialises controller to implement a landing
 static void auto_land_start()
 {
@@ -243,13 +309,41 @@ void auto_rtl_run()
     rtl_run();
 }
 
+// auto_circle_movetoedge_start - initialise waypoint controller to move to edge of a circle with it's center at the specified location
+//  we assume the caller has set the circle's circle with circle_nav.set_center()
+//  we assume the caller has performed all required GPS_ok checks
+static void auto_circle_movetoedge_start()
+{
+    // check our distance from edge of circle
+    Vector3f circle_edge;
+    circle_nav.get_closest_point_on_circle(circle_edge);
+
+    // set the state to move to the edge of the circle
+    auto_mode = Auto_CircleMoveToEdge;
+
+    // initialise wpnav to move to edge of circle
+    wp_nav.set_wp_destination(circle_edge);
+
+    // if we are outside the circle, point at the edge, otherwise hold yaw
+    const Vector3f &curr_pos = inertial_nav.get_position();
+    const Vector3f &circle_center = circle_nav.get_center();
+    float dist_to_center = pythagorous2(circle_center.x - curr_pos.x, circle_center.y - curr_pos.y);
+    if (dist_to_center > circle_nav.get_radius() && dist_to_center > 500) {
+        set_auto_yaw_mode(get_default_auto_yaw_mode(false));
+    } else {
+        // vehicle is within circle so hold yaw to avoid spinning as we move to edge of circle
+        set_auto_yaw_mode(AUTO_YAW_HOLD);
+    }
+}
+
 // auto_circle_start - initialises controller to fly a circle in AUTO flight mode
-static void auto_circle_start(const Vector3f& center)
+static void auto_circle_start()
 {
     auto_mode = Auto_Circle;
 
-    // set circle center
-    circle_nav.set_center(center);
+    // initialise circle controller
+    // center was set in do_circle so initialise with current center
+    circle_nav.init(circle_nav.get_center());
 }
 
 // auto_circle_run - circle in AUTO flight mode
@@ -271,6 +365,10 @@ void auto_circle_run()
 uint8_t get_default_auto_yaw_mode(bool rtl)
 {
     switch (g.wp_yaw_behavior) {
+
+        case WP_YAW_BEHAVIOR_NONE:
+            return AUTO_YAW_HOLD;
+            break;
 
         case WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP_EXCEPT_RTL:
             if (rtl) {
@@ -304,7 +402,7 @@ void set_auto_yaw_mode(uint8_t yaw_mode)
     switch (auto_yaw_mode) {
 
     case AUTO_YAW_LOOK_AT_NEXT_WP:
-        // original_wp_bearing will be set by do_nav_wp or other nav command initialisation functions so no init required
+        // wpnav will initialise heading when wpnav's set_destination method is called
         break;
 
     case AUTO_YAW_ROI:
@@ -313,8 +411,8 @@ void set_auto_yaw_mode(uint8_t yaw_mode)
         break;
 
     case AUTO_YAW_LOOK_AT_HEADING:
-        // keep heading pointing in the direction held in yaw_look_at_heading with no pilot input allowed
-        yaw_look_at_heading = ahrs.yaw_sensor;
+        // keep heading pointing in the direction held in yaw_look_at_heading
+        // caller should set the yaw_look_at_heading
         break;
 
     case AUTO_YAW_LOOK_AHEAD:
@@ -358,7 +456,7 @@ float get_auto_heading(void)
     default:
         // point towards next waypoint.
         // we don't use wp_bearing because we don't want the copter to turn too much during flight
-        return original_wp_bearing;
+        return wp_nav.get_yaw();
         break;
     }
 }

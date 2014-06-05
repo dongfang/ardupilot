@@ -130,13 +130,14 @@ void AP_InertialNav::check_gps()
     const uint32_t now = hal.scheduler->millis();
 
     // compare gps time to previous reading
-    if( _gps != NULL && _gps->last_fix_time != _gps_last_time ) {
+    const AP_GPS &gps = _ahrs.get_gps();
+    if(gps.last_fix_time_ms() != _gps_last_time ) {
 
         // call position correction method
-        correct_with_gps(now, _gps->longitude, _gps->latitude);
+        correct_with_gps(now, gps.location().lng, gps.location().lat);
 
         // record gps time and system time of this update
-        _gps_last_time = _gps->last_fix_time;
+        _gps_last_time = gps.last_fix_time_ms();
     }else{
         // if GPS updates stop arriving degrade position error to 10% over 2 seconds (assumes 100hz update rate)
         if (now - _gps_last_update > AP_INTERTIALNAV_GPS_TIMEOUT_MS) {
@@ -174,14 +175,15 @@ void AP_InertialNav::correct_with_gps(uint32_t now, int32_t lon, int32_t lat)
     // sanity check the gps position.  Relies on the main code calling GPS_Glitch::check_position() immediatley after a GPS update
     if (_glitch_detector.glitching()) {
         // failed sanity check so degrate position_error to 10% over 2 seconds (assumes 5hz update rate)
-        _position_error.x *= 0.7934;
-        _position_error.y *= 0.7934;
+        _position_error.x *= 0.7943;
+        _position_error.y *= 0.7943;
     }else{
         // if our internal glitching flag (from previous iteration) is true we have just recovered from a glitch
         // reset the inertial nav position and velocity to gps values
         if (_flags.gps_glitching) {
             set_position_xy(x,y);
-            set_velocity_xy(_gps->velocity_north() * 100.0f,_gps->velocity_east() * 100.0f);
+            set_velocity_xy(_ahrs.get_gps().velocity().x * 100.0f,
+                            _ahrs.get_gps().velocity().y * 100.0f);
             _position_error.x = 0;
             _position_error.y = 0;
         }else{
@@ -279,9 +281,9 @@ void AP_InertialNav::set_velocity_xy(float x, float y)
 }
 
 // set_velocity_xy - set velocity in latitude & longitude directions (in cm/s)
-float AP_InertialNav::get_velocity_xy()
+float AP_InertialNav::get_velocity_xy() const
 {
-	return safe_sqrt(_velocity.x * _velocity.x + _velocity.y * _velocity.y);
+	return pythagorous2(_velocity.x, _velocity.y);
 }
 
 //

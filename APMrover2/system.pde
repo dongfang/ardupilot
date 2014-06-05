@@ -135,15 +135,10 @@ static void init_ardupilot()
     check_usb_mux();
 
     // we have a 2nd serial port for telemetry
-    hal.uartC->begin(map_baudrate(g.serial1_baud, SERIAL1_BAUD), 128, 128);
-	gcs[1].init(hal.uartC);
+    gcs[1].setup_uart(hal.uartC, map_baudrate(g.serial1_baud, SERIAL1_BAUD), 128, 128);
 
 #if MAVLINK_COMM_NUM_BUFFERS > 2
-    // we may have a 3rd serial port for telemetry
-    if (hal.uartD != NULL) {
-        hal.uartD->begin(map_baudrate(g.serial2_baud, SERIAL2_BAUD), 128, 128);
-        gcs[2].init(hal.uartD);
-    }
+    gcs[2].setup_uart(hal.uartD, map_baudrate(g.serial2_baud, SERIAL2_BAUD), 128, 128);
 #endif
 
 	mavlink_system.sysid = g.sysid_this_mav;
@@ -187,16 +182,7 @@ static void init_ardupilot()
     init_barometer();
 
 	// Do GPS init
-	g_gps = &g_gps_driver;
-    // GPS initialisation
-	g_gps->init(hal.uartB, GPS::GPS_ENGINE_AIRBORNE_4G);
-
-#if GPS2_ENABLE
-    if (hal.uartE != NULL) {
-        g_gps2 = &g_gps2_driver;
-        g_gps2->init(hal.uartE, GPS::GPS_ENGINE_AIRBORNE_4G);
-    }
-#endif
+	gps.init(&DataFlash);
 
 	//mavlink_system.sysid = MAV_SYSTEM_ID;				// Using g.sysid_this_mav
 	mavlink_system.compid = 1;	//MAV_COMP_ID_IMU;   // We do not check for comp id
@@ -232,8 +218,9 @@ static void init_ardupilot()
 
 	startup_ground();
 
-	if (g.log_bitmask & MASK_LOG_CMD)
-			Log_Write_Startup(TYPE_GROUNDSTART_MSG);
+	if (should_log(MASK_LOG_CMD)) {
+        Log_Write_Startup(TYPE_GROUNDSTART_MSG);
+    }
 
     set_mode((enum mode)g.initial_mode.get());
 
@@ -266,9 +253,8 @@ static void startup_ground(void)
 	// ---------------------------
 	trim_radio();
 
-	// initialize commands
-	// -------------------
-	init_commands();
+    // initialise mission library
+    mission.init();
 
     hal.uartA->set_blocking_writes(false);
     hal.uartC->set_blocking_writes(false);
@@ -328,8 +314,9 @@ static void set_mode(enum mode mode)
 			break;
 	}
 
-	if (g.log_bitmask & MASK_LOG_MODE)
+	if (should_log(MASK_LOG_MODE)) {
 		Log_Write_Mode();
+    }
 }
 
 /*
@@ -386,6 +373,7 @@ static void startup_INS_ground(bool force_accel_level)
 
     ahrs.init();
 	ahrs.set_fly_forward(true);
+    ahrs.set_vehicle_class(AHRS_VEHICLE_GROUND);
 
     AP_InertialSensor::Start_style style;
     if (g.skip_gyro_cal && !force_accel_level) {

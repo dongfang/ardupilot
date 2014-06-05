@@ -1,0 +1,26 @@
+
+The RC channel model assumes that APM is a filter between RC input and output.
+
+Why change it?
+
+1) Not a good match for ArduCopter. There, input channels 1-4 never go directly to an output. The same is true for other
+   vehicles that are not derived from direct connections between RC receiver and servo/motor outputs.
+2) Current implementation is overly complicated and exposes too many internal members and internal functions.
+   It is not transparent which if the RCChannel state is updated when.
+3) It breaks down in the case of elevon / V-tail mixing. There are "special cases" an ArduPlane.pde, attitude.pde, failsafe.pde and radio.pde, where really everything should be handled in one place.
+4) It is not universally used: Numerous references exist directly to AP_HAL radio in the code, and elevon / V-tail 
+   mixing and other calculation are made in the PWM domain.
+5) It breaks down where there is no plain old PWM RC. Okay, the HIL gets along, but only by simulating PWM microsecond values.
+
+
+
+Looking at the requirements (derived reversely from the code), the following seems to be needed:
+
+ArduPlane:
+- ArduPlane works in a physical environment where the plane is flyable with input RC channels connected
+directly to output channels. Control direction and limits are set up on the RC transmitter as with a non-robotic plane. 
+Same for elevon / V-tails mixing and other transforms.
+- Reading of RC inputs is needed on the roll, pitch, yaw and throttle axes. If elevon / V-tail or other transformations from
+these axes are used in the hardware airframe/RC setup, this needs to be transformed to these axes.
+- Some input channels are not meaningfully output (eg. flight mode)
+- Some output channels may not have RC input (eg. 

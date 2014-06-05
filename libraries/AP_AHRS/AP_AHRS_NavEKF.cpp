@@ -52,8 +52,8 @@ void AP_AHRS_NavEKF::update(void)
     _dcm_attitude(roll, pitch, yaw);
 
     if (!ekf_started) {
-        // if we have a compass set and GPS lock we can start the EKF
-        if (get_compass() && get_gps()->status() >= GPS::GPS_OK_FIX_3D) {
+        // if we have a GPS lock we can start the EKF
+        if (get_gps().status() >= AP_GPS::GPS_OK_FIX_3D) {
             if (start_time_ms == 0) {
                 start_time_ms = hal.scheduler->millis();
             }
@@ -123,6 +123,8 @@ float AP_AHRS_NavEKF::get_error_yaw(void)
 Vector3f AP_AHRS_NavEKF::wind_estimate(void)
 {
     if (!using_EKF()) {
+        // EKF does not estimate wind speed when there is no airspeed
+        // sensor active
         return AP_AHRS_DCM::wind_estimate();
     }
     Vector3f wind;
@@ -189,9 +191,9 @@ Vector2f AP_AHRS_NavEKF::groundspeed_vector(void)
     return Vector2f(vec.x, vec.y);
 }
 
-void AP_AHRS_NavEKF::set_home(int32_t lat, int32_t lng, int32_t alt_cm)
+void AP_AHRS_NavEKF::set_home(const Location &loc)
 {
-    AP_AHRS_DCM::set_home(lat, lng, alt_cm);
+    AP_AHRS_DCM::set_home(loc);
 }
 
 // return true if inertial navigation is active
@@ -224,6 +226,17 @@ bool AP_AHRS_NavEKF::get_relative_position_NED(Vector3f &vec) const
 bool AP_AHRS_NavEKF::using_EKF(void) const
 {
     return ekf_started && _ekf_use && EKF.healthy();
+}
+
+/*
+  check if the AHRS subsystem is healthy
+*/
+bool AP_AHRS_NavEKF::healthy(void)
+{
+    if (_ekf_use) {
+        return ekf_started && EKF.healthy();
+    }
+    return AP_AHRS_DCM::healthy();    
 }
 
 #endif // AP_AHRS_NAVEKF_AVAILABLE

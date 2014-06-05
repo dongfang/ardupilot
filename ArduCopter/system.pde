@@ -182,28 +182,14 @@ static void init_ardupilot()
     ap.usb_connected = true;
     check_usb_mux();
 
-    //#if CONFIG_HAL_BOARD != HAL_BOARD_APM2
+#if CONFIG_HAL_BOARD != HAL_BOARD_APM2
     // we have a 2nd serial port for telemetry on all boards except
     // APM2. We actually do have one on APM2 but it isn't necessary as
     // a MUX is used
-    // Originally, gcs3 would not get initialized if there was a multiplexer pin
-    // defined. That would defeat UART2 telemetry on all APM2s. If would however
-    // be nice if we could connect a 3DR or XBee to uartA _and_ a further telemetry
-    // system to uartC. I have changed the meaning of USB_MUX_PIN to _not_ determine
-    // which serial ports should be inited, and added the SERIAL3_MODE define to decide
-    // what kind of telemetry HW should be expected at the 2nd UART:
-    // SERIAL3_MODE==DISABLED (0): Disabled.
-    // SERIAL3_MODE==ENALBED  (1): Raw MAVLink for a XBee or similar.
-    // SERIAL3_MODE==MOBILE   (2): DroneCell data-via-commands
-#if SERIAL3_MODE == ENABLED
-    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
-    gcs3.init(hal.uartC);
+    gcs[1].setup_uart(hal.uartC, map_baudrate(g.serial1_baud, SERIAL1_BAUD), 128, 128);
 #endif
 #if MAVLINK_COMM_NUM_BUFFERS > 2
-    if (hal.uartD != NULL) {
-        hal.uartD->begin(map_baudrate(g.serial2_baud, SERIAL2_BAUD), 128, 128);
-        gcs[2].init(hal.uartD);
-    }
+    gcs[2].setup_uart(hal.uartD, map_baudrate(g.serial2_baud, SERIAL2_BAUD), 128, 128);
 #endif
 
     // identify ourselves correctly with the ground station
@@ -237,16 +223,7 @@ static void init_ardupilot()
  #endif // CONFIG_ADC
 
     // Do GPS init
-    g_gps = &g_gps_driver;
-    // GPS Initialization
-    g_gps->init(hal.uartB, GPS::GPS_ENGINE_AIRBORNE_4G);
-
-#if GPS2_ENABLE
-    if (hal.uartE != NULL) {
-        g_gps2 = &g_gps2_driver;
-        g_gps2->init(hal.uartE, GPS::GPS_ENGINE_AIRBORNE_4G);
-    }
-#endif
+    gps.init(&DataFlash);
 
     if(g.compass_enabled)
         init_compass();
@@ -296,9 +273,8 @@ static void init_ardupilot()
     init_sonar();
 #endif
 
-    // initialize commands
-    // -------------------
-    init_commands();
+    // initialise mission library
+    mission.init();
 
     // initialise the flight mode and aux switch
     // ---------------------------
@@ -329,6 +305,7 @@ static void startup_ground(bool force_gyro_cal)
 
     // initialise ahrs (may push imu calibration into the mpu6000 if using that device).
     ahrs.init();
+    ahrs.set_vehicle_class(AHRS_VEHICLE_COPTER);
 
     // Warm up and read Gyro offsets
     // -----------------------------
@@ -348,7 +325,8 @@ static void startup_ground(bool force_gyro_cal)
 // returns true if the GPS is ok and home position is set
 static bool GPS_ok()
 {
-    if (g_gps != NULL && ap.home_is_set && g_gps->status() == GPS::GPS_OK_FIX_3D && !gps_glitch.glitching() && !failsafe.gps) {
+    if (ap.home_is_set && gps.status() >= AP_GPS::GPS_OK_FIX_3D && 
+        !gps_glitch.glitching() && !failsafe.gps) {
         return true;
     }else{
         return false;

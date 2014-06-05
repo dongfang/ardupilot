@@ -24,7 +24,7 @@ static void arm_motors_check()
     }
 
     // allow arming/disarming in Loiter and AltHold if landed
-    if (ap.land_complete && (control_mode == LOITER || control_mode == ALT_HOLD)) {
+    if (ap.land_complete && (control_mode == LOITER || control_mode == ALT_HOLD || control_mode == HYBRID)) {
         allow_arming = true;
     }
 
@@ -61,6 +61,7 @@ static void arm_motors_check()
             }else{
                 // reset arming counter if pre-arm checks fail
                 arming_counter = 0;
+                AP_Notify::flags.arming_failed = true;
             }
         }
 
@@ -84,6 +85,7 @@ static void arm_motors_check()
 
     // Yaw is centered so reset arming counter
     }else{
+        AP_Notify::flags.arming_failed = false;
         arming_counter = 0;
     }
 }
@@ -101,7 +103,7 @@ static void auto_disarm_check()
     }
 
     // allow auto disarm in manual flight modes or Loiter/AltHold if we're landed
-    if(manual_flight_mode(control_mode) || (ap.land_complete && (control_mode == LOITER || control_mode == ALT_HOLD))) {
+    if(manual_flight_mode(control_mode) || (ap.land_complete && (control_mode == LOITER || control_mode == ALT_HOLD || control_mode == HYBRID))) {
         auto_disarming_counter++;
 
         if(auto_disarming_counter >= AUTO_DISARMING_DELAY) {
@@ -248,7 +250,7 @@ static void pre_arm_checks(bool display_failure)
     // check Compass
     if ((g.arming_check == ARMING_CHECK_ALL) || (g.arming_check & ARMING_CHECK_COMPASS)) {
         // check the compass is healthy
-        if(!compass.healthy()) {
+        if(!compass.healthy(0)) {
             if (display_failure) {
                 gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Compass not healthy"));
             }
@@ -315,7 +317,7 @@ static void pre_arm_checks(bool display_failure)
             return;
         }
     }
-
+#if CONFIG_HAL_BOARD != HAL_BOARD_VRBRAIN
 #ifndef CONFIG_ARCH_BOARD_PX4FMU_V1
     // check board voltage
     if ((g.arming_check == ARMING_CHECK_ALL) || (g.arming_check & ARMING_CHECK_VOLTAGE)) {
@@ -326,6 +328,7 @@ static void pre_arm_checks(bool display_failure)
             return;
         }
     }
+#endif
 #endif
 
     // check various parameter values
@@ -409,16 +412,32 @@ static bool pre_arm_gps_checks(bool display_failure)
 {
     float speed_cms = inertial_nav.get_velocity().length();     // speed according to inertial nav in cm/s
 
-    // ensure GPS is ok and our speed is below 50cm/s
-    if (!GPS_ok() || gps_glitch.glitching() || speed_cms == 0 || speed_cms > PREARM_MAX_VELOCITY_CMS) {
+    // check GPS is not glitching
+    if (gps_glitch.glitching()) {
         if (display_failure) {
-            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Bad GPS Pos"));
+            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: GPS Glitch"));
+        }
+        return false;
+    }
+
+    // ensure GPS is ok
+    if (!GPS_ok()) {
+        if (display_failure) {
+            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Need 3D Fix"));
+        }
+        return false;
+    }
+
+    // check speed is below 50cm/s
+    if (speed_cms == 0 || speed_cms > PREARM_MAX_VELOCITY_CMS) {
+        if (display_failure) {
+            gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: Bad Velocity"));
         }
         return false;
     }
 
     // warn about hdop separately - to prevent user confusion with no gps lock
-    if (g_gps->hdop > g.gps_hdop_good) {
+    if (gps.get_hdop() > g.gps_hdop_good) {
         if (display_failure) {
             gcs_send_text_P(SEVERITY_HIGH,PSTR("PreArm: High GPS HDOP"));
         }
@@ -516,7 +535,10 @@ static void init_disarm_motors()
 
     // we are not in the air
     set_land_complete(true);
-    
+
+    // reset the mission
+    mission.reset();
+
     // setup fast AHRS gains to get right attitude
     ahrs.set_fast_gains(true);
 
@@ -537,40 +559,14 @@ static void init_disarm_motors()
 static void
 set_servos_4()
 {
+    // check if we are performing the motor test
+    if (ap.motor_test) {
+        motor_test_output();
+    } else {
 #if FRAME_CONFIG == TRI_FRAME
-    // To-Do: implement improved stability patch for tri so that we do not need to limit throttle input to motors
-    g.rc_3.servo_out = min(g.rc_3.servo_out, 800);
+        // To-Do: implement improved stability patch for tri so that we do not need to limit throttle input to motors
+        g.rc_3.servo_out = min(g.rc_3.servo_out, 800);
 #endif
-    motors.output();
-}
-
-// servo_write - writes to a servo after checking the channel is not used for a motor
-static void servo_write(uint8_t ch, uint16_t pwm)
-{
-    bool servo_ok = false;
-
-    #if (FRAME_CONFIG == QUAD_FRAME || FRAME_CONFIG == COAX_FRAME)
-        // Quads can use RC5 and higher as servos
-        if (ch >= CH_5) servo_ok = true;
-    #elif (FRAME_CONFIG == TRI_FRAME || FRAME_CONFIG == SINGLE_FRAME)
-        // Tri's and Singles can use RC5, RC6, RC8 and higher
-        if (ch == CH_5 || ch == CH_6 || ch >= CH_8) servo_ok = true;
-    #elif (FRAME_CONFIG == HEXA_FRAME || FRAME_CONFIG == Y6_FRAME)
-        // Hexa and Y6 can use RC7 and higher
-        if (ch >= CH_7) servo_ok = true;
-    #elif (FRAME_CONFIG == OCTA_FRAME || FRAME_CONFIG == OCTA_QUAD_FRAME)
-        // Octa and X8 can use RC9 and higher
-        if (ch >= CH_9) servo_ok = true;
-    #elif (FRAME_CONFIG == HELI_FRAME)
-        // Heli's can use RC5, RC6, RC7, not RC8, and higher
-        if (ch == CH_5 || ch == CH_6 || ch == CH_7 || ch >= CH_9) servo_ok = true;
-    #else
-        // throw compile error if frame type is unrecognise
-        #error Unrecognised frame type
-    #endif
-
-    if (servo_ok) {
-        hal.rcout->enable_ch(ch);
-        hal.rcout->write(ch, pwm);
+        motors.output();
     }
 }

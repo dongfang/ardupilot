@@ -1,0 +1,29 @@
+The home location in ArdupilotMega
+
+
+APM side uses of home location:
+1) RTL target
+2) Post mission target
+3) Altitude offset for barometer
+
+
+MAVLink commands that affect home location:
+
+
+
+APM side:
+struct Location home is a home location
+
+waypoint #0 is also a home location.
+
+
+
+Mission Planner treatment of home location:
+
+At WP list write to APM: (FlightPlanner.saveWPs)
+WP #0 is composed of the latitude, longitude and altitude in the UI home position fields
+The number of WPs to be sent is set to the number of WPs in the WP list + one (namely #0, the home location)
+Each WP is composed from list data and sent (with index + list index+1). The frame MAV_FRAME.GLOBAL is used if "absolute altitude" is checked, else MAV_FRAME_GLOBAL_RELATIVE_ALT.
+The parameters(!) ALT_HOLD_RTL and RTL_ALT are set to the default alt. iff the "RTL@default alt" checkbox is checked.
+The parameters(!) WP_RADUIS, LOITER_ALT and WP_LOITER_ALT are set.
+

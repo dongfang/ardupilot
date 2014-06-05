@@ -9,8 +9,14 @@ static bool ofloiter_init(bool ignore_checks)
 {
 #if OPTFLOW == ENABLED
     if (g.optflow_enabled || ignore_checks) {
-        // initialise filters on roll/pitch input
-        reset_roll_pitch_in_filters(g.rc_1.control_in, g.rc_2.control_in);
+
+        // initialize vertical speed and acceleration
+        pos_control.set_speed_z(-g.pilot_velocity_z_max, g.pilot_velocity_z_max);
+        pos_control.set_accel_z(g.pilot_accel_z);
+
+        // initialise altitude target to stopping point
+        pos_control.set_target_to_stopping_point_z();
+
         return true;
     }else{
         return false;
@@ -70,7 +76,7 @@ static void ofloiter_run()
         target_pitch = get_of_pitch(target_pitch);
 
         // call attitude controller
-        attitude_control.angle_ef_roll_pitch_rate_ef_yaw(target_roll, target_pitch, target_yaw_rate);
+        attitude_control.angle_ef_roll_pitch_rate_ef_yaw_smooth(target_roll, target_pitch, target_yaw_rate, get_smoothing_gain());
 
         // run altitude controller
         if (sonar_alt_health >= SONAR_ALT_HEALTH_MAX) {
