@@ -540,8 +540,11 @@
 // Buf size between MobileDriver and SERIAL3 port
 // Since the modem is checked till buffers empty 100 times/s and there is a max
 // of 5760 chars/sec, 64 should be enough. Need to verify that.
-#ifndef MOBILE_BUFSIZE
- # define MOBILE_BUFSIZE 64
+#ifndef MOBILE_BUFSIZE_IN
+ # define MOBILE_BUFSIZE_IN 64
+#endif
+#ifndef MOBILE_BUFSIZE_OUT
+ # define MOBILE_BUFSIZE_OUT 128
 #endif
 
 /*

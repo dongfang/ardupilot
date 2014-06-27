@@ -132,7 +132,7 @@ static void init_ardupilot()
     gcs3.init(hal.uartC);
 #elif SERIAL3_MODE == MOBILE
     // with 5760 bytes/s and 100 iterations/s we need 58 bytes of buffer.
-    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), MOBILE_BUFSIZE, MOBILE_BUFSIZE);
+    hal.uartC->begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), MOBILE_BUFSIZE_IN, MOBILE_BUFSIZE_OUT);
  	mobile.begin(hal.uartC, SERIAL_BUFSIZE_IN, SERIAL_BUFSIZE_OUT);
 	gcs3.init(&mobile);
 #endif

@@ -5,7 +5,7 @@
 
 class SIM900Driver : public MobileDriver {
 public:
-	SIM900Driver(void) : MobileDriver(){}
+	SIM900Driver(void) : MobileDriver() {}
 
 protected:
 	const MobileDriver::State* initialState(void) const;

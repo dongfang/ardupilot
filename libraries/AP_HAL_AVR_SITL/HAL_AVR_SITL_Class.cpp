@@ -64,6 +64,8 @@ void HAL_AVR_SITL::init(int argc, char * const argv[]) const
 {
     _sitl_state->init(argc, argv);
     scheduler->init(NULL);
+
+    uartC->begin(57600);
     uartA->begin(115200);
 
     rcin->init(NULL);

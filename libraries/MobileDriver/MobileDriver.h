@@ -8,8 +8,8 @@
 class MobileDriver : public AP_HAL::BetterStream  {
 public:
 	static const uint8_t RESPONSE_BUFLEN = 80;
-	// After 15 seconds of no reception of any kind of response from mobile, we restart.
-	static const uint16_t TIMEOUT = 15 * 50;
+	// After 8 seconds of no reception of any kind of response from mobile, we restart.
+	static const uint16_t TIMEOUT = 8 * 50;
 
 	static const uint8_t PHONENUMBERLENGTH = 16;
 
@@ -67,7 +67,7 @@ public:
 	class State {
 	public:
 		virtual void task(MobileDriver & outer) const = 0;
-		void checkTimeout(MobileDriver & outer) const;
+		virtual void afterTimeout(MobileDriver & outer) const;
 	};
 
 	class DecisionState: public State {
@@ -92,6 +92,7 @@ public:
 	class DeadState: public DecisionState {
 	public:
 		virtual void task(MobileDriver & outer) const;
+		virtual void afterTimeout(MobileDriver & outer) const;
 	};
 
 	class SIMNotReadyState: public DeadState {
@@ -338,6 +339,9 @@ protected:
 		_bufptr = 0;
 		_timeout = 0;
 		_numCRLF = 0;
+
+		// experimental!
+		//_txbuffer
 	}
 
 	void restartState(void) {
@@ -351,6 +355,8 @@ protected:
 		_bufptr = 0;
 		_numCRLF = 0;
 	}
+
+	void checkTimeout(const State* const state);
 
 	// Pattern match of response string to tokens. There is a wildcard '?'.
 	bool match(prog_char const * token) const {
@@ -408,12 +414,12 @@ protected:
 
 	// We really need public so that "inner classes" can access?
 public:
-	static int  numPhonebookEntriesRead;
+	static uint8_t  numPhonebookEntriesRead;
 	static char hostname[21];
 	static char protocol[4];
 	static char port[6];
 	static char apn[21];
-	static char pilotsNumber[PHONENUMBERLENGTH];
+	//	static char pilotsNumber[PHONENUMBERLENGTH];
 	static IncomingSMS  incomingSMS;
 
 	static char dataTransmissionSize[4];
@@ -422,3 +428,4 @@ public:
 #endif
 
 #include "SIM900Driver.h"
+#include "SIM700Driver.h"

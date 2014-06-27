@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include "MobileDriver.h"
 
-int  MobileDriver::numPhonebookEntriesRead;
-char MobileDriver::hostname[21] = "www.sky-cam.dk";
-char MobileDriver::protocol[4] = "UDP";
-char MobileDriver::port[6] = "10000";
+uint8_t MobileDriver::numPhonebookEntriesRead;
+char MobileDriver::hostname[21] = "www.dronex.ch";
+char MobileDriver::protocol[4] = "TCP";
+char MobileDriver::port[6] = "5760";
+// We don't support username and password login. Seems no phone companies enforce it.
 char MobileDriver::apn[21] = "internet";
-char MobileDriver::pilotsNumber[16] = "";
+//char MobileDriver::pilotsNumber[16] = "";
 MobileDriver::IncomingSMS MobileDriver::incomingSMS;
 char MobileDriver::dataTransmissionSize[4];
 
@@ -18,18 +19,8 @@ MobileDriver::MobileDriver() :
 		{
 }
 
-void MobileDriver::State::checkTimeout(MobileDriver & outer) const {
-	if (outer._timeout++ >= TIMEOUT) {
-		// Send some harmless dummy spaces. This finishes messages that were never sent (for whatever crazy reason).
-		int16_t numSpaces = outer._mobile->txspace();
-		if(numSpaces>62) numSpaces = 62;
-		for(int16_t i=0; i<numSpaces; i++) {
-			outer._mobile->write(' ');
-		}
-		outer._mobile->write('\r');
-		outer._mobile->write('\n');
-		outer.restartState();
-	}
+void MobileDriver::State::afterTimeout(MobileDriver & outer) const {
+	outer.restartState();
 }
 
 MobileDriver::DecisionState::DecisionState() :
@@ -49,6 +40,10 @@ MobileDriver::DecisionState::DecisionState(
 const MobileDriver::State* MobileDriver::DecisionState::match(MobileDriver & outer) const {
 	uint8_t i;
 	for (i = 0; i < _numTransitions; i++) {
+		char temp[80];
+		memcpy(temp, outer._responseBuffer, outer._bufptr);
+		temp[outer._bufptr] = 0;
+		::printf("Testing %s against %s\n", temp, _transitions[i]._token);
 		if (outer.match(_transitions[i]._token)) {
 			return _transitions[i]._state;
 		}
@@ -67,48 +62,54 @@ void MobileDriver::DecisionState::receiveResponseLine(MobileDriver & outer) cons
 		return;
 	}
 
-	/*
-	 *  This will accept one or more CR/LF chars as a response header,
-	 *  and consume them all.
-	 *  State is changed after a CR/LF character is received. The second CR/LF character is
-	 *  simply ignored. This means that some multi line responses with single CRs or LFs in
-	 *  them will be interpreted as multiple one liners; maybe this is not ideal.
-	 *  2 solution ideas: 1) Check for both CRLF always, or 2) peek when expecting
-	 *  multiline responses and see if there is the 2nd CR or LF.
-	 */
-	/*
-	if (data == '\r' || data == '\n') {
+	if (data == '\r') {
+		::printf("\\r\n");
+	} else if (data == '\n') {
+		::printf("\\n\n");
+	} else if (data == ' ') {
+		::printf("<SPC>");
+	} else
+		::printf("%c", data);
+
+	if (data != '\r' && data != '\n') {
+		// At ANY non newline we start buffering.
+		outer.add((uint8_t) data);
+		outer._progress = P_BUFFERING_RESPONSE_LINE;
+	} else {
+		// If we already buffered something, then this is the end.
+		if (outer._bufptr) {
+			outer._progress = P_RESPONSE_LINE_COMPLETE;
+		}
+	}
+
+
+		/*
+		if (outer._progress == P_WAITING_INITIAL_WS) {
+			//if (outer._numCRLF) {
+				outer._progress = P_BUFFERING_RESPONSE_LINE;
+			//	outer._numCRLF = 0; // reset for next state.
+			//}
+			// else outer._numCRLF = 1;
+		}
+	} else if (outer._progress == P_BUFFERING_RESPONSE_LINE) {
+		//if (outer._numCRLF) {
+		//		outer._progress = P_RESPONSE_LINE_COMPLETE;
+		//		outer._numCRLF = 0;
+		if (outer._bufptr) {
+		outer._progress = P_RESPONSE_LINE_COMPLETE;
+
+		// else outer._numCRLF = 1;
+		}
+		// throw away whitespace.
+	} else {
+		// We accept responses without leading WS.
 		if (outer._progress == P_WAITING_INITIAL_WS) {
 			outer._progress = P_BUFFERING_RESPONSE_LINE;
-		} else if (outer._progress == P_BUFFERING_RESPONSE_LINE && outer._bufptr) {
-			outer._progress = P_RESPONSE_LINE_COMPLETE;
-
 		}
-		// throw away whitespace.
-	} else {
 		outer.add((uint8_t) data);
+		// outer._numCRLF = 0;
 	}
 	*/
-
-	if (data == '\r' || data == '\n') {
-		if (outer._progress == P_WAITING_INITIAL_WS) {
-			if (outer._numCRLF) {
-				outer._progress = P_BUFFERING_RESPONSE_LINE;
-				outer._numCRLF = 0; // reset for next state.
-			}
-			else outer._numCRLF = 1;
-		} else if (outer._progress == P_BUFFERING_RESPONSE_LINE) {
-			if (outer._numCRLF) {
-				outer._progress = P_RESPONSE_LINE_COMPLETE;
-				outer._numCRLF = 0;
-			}
-			else outer._numCRLF = 1;
-		}
-		// throw away whitespace.
-	} else {
-		outer.add((uint8_t) data);
-		outer._numCRLF = 0;
-	}
 }
 
 const MobileDriver::State* MobileDriver::DecisionState::findSuccessor(MobileDriver & outer) const {
@@ -118,6 +119,7 @@ const MobileDriver::State* MobileDriver::DecisionState::findSuccessor(MobileDriv
 		// Try if the response is really no response at all, but a known URC.
 		// Unfortunately, the SIM900 does not hold back URCs between the start of an AT command
 		// and the end of its response so we can expect them almost any time!!
+		::printf("No match; trying URCs\n");
 		result = outer.matchURCs();
 	}
 	return result;
@@ -130,6 +132,7 @@ void MobileDriver::DecisionState::responseLineCompleted(MobileDriver & outer) co
 		outer.restartState();
 	} else {
 		// Found successor, apply that.
+		//outer._timeout = 0;
 		outer.beginState(successor);
 	}
 }
@@ -137,7 +140,8 @@ void MobileDriver::DecisionState::responseLineCompleted(MobileDriver & outer) co
 void MobileDriver::DecisionState::task(MobileDriver & outer) const {
 	// When the command has been sent, we switch to waiting for <CR><LF>response<CR><LF>...
 	// When returning from URC "interrupts" aka receiving data, we wait for the original RC still outstanding.
-	checkTimeout(outer);
+	//checkTimeout(outer);
+	outer.checkTimeout(this);
 	if (outer._progress == P_RETURNED_FROM_INTERRUPT) {
 		outer._progress = P_WAITING_INITIAL_WS;
 	}
@@ -193,6 +197,9 @@ void MobileDriver::CommandState::task(MobileDriver & outer) const {
 	if (outer._progress == P_START) {
 		// Make sure there is space for the command and a trailing CR.
 		if ((size_t) (outer._mobile->txspace()) > strlen_P(_command)+20) {
+
+			::printf("Transmitting the command; we have %d bytes of %d space\n", strlen_P(_command), outer._mobile->txspace());
+
 			sendCommand(outer);
 			outer._progress = P_WAITING_INITIAL_WS;
 		}
@@ -201,8 +208,38 @@ void MobileDriver::CommandState::task(MobileDriver & outer) const {
 }
 
 void MobileDriver::CommandState::sendCommand(MobileDriver & outer) const {
-	outer._mobile->printf_P(_command, _arguments[0], _arguments[1], _arguments[2], _arguments[3]);
+
+	// TODO: Hmm renote again.
+	char temp[128];
+	int i=0;
+	char data;
+	while((data = outer._mobile->read()) >= 0) {
+		temp[i++] = data;
+	}
+	temp[i] = 0;
+
+	::printf("Discarded this (%d): %s", i, temp);
+
+	//while(outer._mobile->read() >= 0);
+	//outer._mobile->printf_P(_command, _arguments[0], _arguments[1], _arguments[2], _arguments[3]);
+
+	::sprintf(temp, _command, _arguments[0], _arguments[1], _arguments[2], _arguments[3]);
+	outer._mobile->print(temp);
 	outer._mobile->print_P(PSTR("\r\n"));
+
+	::printf("\nSent command: ");
+	i=0;
+	while((data = temp[i++]) != 0) {
+		if (data == '\r') {
+			::printf("\\r\n");
+		} else if (data == '\n') {
+			::printf("\\n\n");
+		} else if (data == ' ') {
+			::printf("<SPC>");
+		} else
+			::printf("%c", data);
+	}
+	::printf("\n");
 }
 
 MobileDriver::QueryState::QueryState (
@@ -249,6 +286,10 @@ void MobileDriver::ReadPhonebookState::responseLineCompleted(MobileDriver & oute
 		if(successor==this) { // there is a result of the query (the response begins with +CPBF,
 			// for which a transition to "this" was configured).
 			queryResult(outer);
+			char temp[80];
+			memcpy(temp, outer._responseBuffer, outer._bufptr);
+			temp[outer._bufptr] = 0;
+			::printf("This was a phonebook entry: %s", temp);
 			outer._progress = P_WAITING_INITIAL_WS;
 			outer._bufptr = 0;
 		} else if(successor == _continueState && MobileDriver::numPhonebookEntriesRead == 0) {
@@ -282,11 +323,12 @@ void MobileDriver::ReadPhonebookState::queryResult(MobileDriver & outer) const {
 	}
 	name[j] = 0;
 
+	/*
 	if(!strcasecmp_P(name, PSTR("my pilot"))) {
 		strcpy(MobileDriver::pilotsNumber, number);
 	}
-
-	else if(strlen(number)==3) {
+	
+	else*/ if(strlen(number)==3) {
 		if(number[0]=='#' && number[2]=='#') {
 			switch(number[1]) {
 			case '1':
@@ -302,8 +344,6 @@ void MobileDriver::ReadPhonebookState::queryResult(MobileDriver & outer) const {
 		}
 	}
 
-	outer._progress = P_WAITING_INITIAL_WS;
-	outer._bufptr = 0;
 	MobileDriver::numPhonebookEntriesRead++;
 }
 
@@ -477,6 +517,10 @@ void MobileDriver::DeadState::task(MobileDriver & outer) const {
 	DecisionState::task(outer);
 }
 
+void MobileDriver::DeadState::afterTimeout(MobileDriver & outer) const {
+	outer.beginState(outer.resetState());
+}
+
 void MobileDriver::SIMNotReadyState::task(MobileDriver & outer) const {
 	// Do something to indicate the problem, if required. LED on, ....
 	// fprintf(stderr, "SIM NOT READY DETECTED!\n");
@@ -497,7 +541,7 @@ void MobileDriver::DataTransmissionState::task(MobileDriver & outer) const {
 	int16_t tmpNumBytes;
 	int16_t i;
 
-	checkTimeout(outer);
+	outer.checkTimeout(this);
 
 	// An interrupt can only have happened after waiting for the prompt. Return to there.
 	if (outer._progress == P_RETURNED_FROM_INTERRUPT) {
@@ -514,7 +558,15 @@ void MobileDriver::DataTransmissionState::task(MobileDriver & outer) const {
 	if (outer._progress == P_START) {
 		// Make sure there is space for the command and a trailing CR.
 		if ((size_t) outer._mobile->txspace() >= 20) {
+
+			if (outer._numTxBytes == 0) {
+				// This is friggin strange. Sometimes the byte count goes to zerp by what?
+				// Modems hate zero bytes so we have to transmit some dummy data (or quit).
+				outer._numTxBytes = 1;
+			}
+
 			sprintf(MobileDriver::dataTransmissionSize,"%d",outer._numTxBytes);
+
 			sendCommand(outer);
 			outer._progress = P_WAITING_TRANSMIT_WS;
 		}
@@ -676,6 +728,22 @@ void MobileDriver::beginTransmitMessage(int16_t length) {
 void MobileDriver::endTransmitMessage(int16_t length) {
 }
 
+void MobileDriver::checkTimeout(const State* const state) {
+	if (_timeout++ >= TIMEOUT) {
+		::printf("TIMEOUT!\n");
+		// Send some harmless dummy spaces. This finishes messages that were never sent (for whatever crazy reason).
+		int16_t numSpaces = _mobile->txspace();
+		if(numSpaces>62) numSpaces = 62;
+		for(int16_t i=0; i<numSpaces; i++) {
+			_mobile->write(' ');
+		}
+		_mobile->write('\r');
+		_mobile->write('\n');
+		//outer.restartState();
+		state->afterTimeout(*this);
+		_timeout = TIMEOUT/2;
+	}
+}
 
 /*
  * Main driver of the state machine.
